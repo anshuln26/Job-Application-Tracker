@@ -146,6 +146,32 @@ export default function AnalyticsView({ applications }) {
         </div>
       </div>
 
+      {/* Monthly Application Momentum Area Chart */}
+      <div className="glass-panel" style={{ padding: '20px' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <TrendingUp size={18} style={{ color: 'var(--accent-primary)' }} /> Application Velocity & Momentum
+        </h3>
+        <div style={{ height: '240px' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={timelineData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="appGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366F1" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#6366F1" stopOpacity={0.0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" />
+              <XAxis dataKey="month" stroke="var(--text-secondary)" fontSize={12} />
+              <YAxis allowDecimals={false} stroke="var(--text-secondary)" fontSize={12} />
+              <Tooltip
+                contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+              />
+              <Area type="monotone" dataKey="Applications" stroke="#6366F1" strokeWidth={2} fillOpacity={1} fill="url(#appGradient)" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* Strategic Insights Panel */}
       <div className="glass-panel" style={{ padding: '20px', background: 'linear-gradient(135deg, var(--bg-surface), var(--bg-card))' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>

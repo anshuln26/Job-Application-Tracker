@@ -4,16 +4,12 @@ import {
   Plus,
   MapPin,
   Calendar,
-  ExternalLink,
   Edit2,
   Trash2,
   Bookmark,
   Send,
   Trophy,
   XCircle,
-  MoreVertical,
-  ChevronRight,
-  ChevronLeft,
   DollarSign
 } from 'lucide-react';
 import confetti from 'canvas-confetti';

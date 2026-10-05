@@ -180,6 +180,7 @@ export default function App() {
           showToast('Invalid JSON file format.', 'error');
         }
       } catch (err) {
+        console.error('Failed to parse imported JSON:', err);
         showToast('Error parsing JSON file.', 'error');
       }
     };
@@ -284,13 +285,16 @@ export default function App() {
       </main>
 
       {/* Application Add/Edit Modal */}
-      <JobModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveApplication}
-        application={editingApp}
-        initialStage={initialStageForModal}
-      />
+      {isModalOpen && (
+        <JobModal
+          key={editingApp ? editingApp.id : `new-${initialStageForModal}`}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSave={handleSaveApplication}
+          application={editingApp}
+          initialStage={initialStageForModal}
+        />
+      )}
 
       {/* Confirmation Modal */}
       <ConfirmModal

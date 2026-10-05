@@ -1,67 +1,45 @@
-import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Calendar, Link, DollarSign, User, FileText, Tag, Briefcase } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Plus, Trash2, Calendar, User, FileText, Briefcase } from 'lucide-react';
 import { STAGES, WORK_TYPES, PRIORITIES } from '../data/mockData';
 
-export default function JobModal({ isOpen, onClose, onSave, application, initialStage = 'applied' }) {
-  const [activeTab, setActiveTab] = useState('info');
-
-  const [formData, setFormData] = useState({
-    id: '',
+const createInitialFormData = (application, initialStage) => {
+  if (application) {
+    return {
+      ...application,
+      tagInput: '',
+      tags: application.tags || [],
+      timeline: application.timeline || [],
+      interviews: application.interviews || []
+    };
+  }
+  const today = new Date().toISOString().split('T')[0];
+  return {
+    id: 'job-' + Date.now(),
     company: '',
     title: '',
     location: '',
     workType: 'Remote',
-    status: initialStage,
+    status: initialStage || 'applied',
     priority: 'medium',
     salaryMin: 120000,
     salaryMax: 150000,
     currency: '$',
-    appliedDate: new Date().toISOString().split('T')[0],
+    appliedDate: today,
     jobUrl: '',
     contactName: '',
     contactEmail: '',
-    resumeVersion: '',
-    tags: [],
+    resumeVersion: 'Software_Engineer_2026.pdf',
+    tags: ['React', 'Fullstack'],
     tagInput: '',
     notes: '',
-    timeline: [],
+    timeline: [{ id: 't-1', stage: 'Applied', date: today, notes: 'Submitted application portal.' }],
     interviews: []
-  });
+  };
+};
 
-  useEffect(() => {
-    if (application) {
-      setFormData({
-        ...application,
-        tagInput: '',
-        tags: application.tags || [],
-        timeline: application.timeline || [],
-        interviews: application.interviews || []
-      });
-    } else {
-      setFormData({
-        id: 'job-' + Date.now(),
-        company: '',
-        title: '',
-        location: '',
-        workType: 'Remote',
-        status: initialStage || 'applied',
-        priority: 'medium',
-        salaryMin: 120000,
-        salaryMax: 150000,
-        currency: '$',
-        appliedDate: new Date().toISOString().split('T')[0],
-        jobUrl: '',
-        contactName: '',
-        contactEmail: '',
-        resumeVersion: 'Software_Engineer_2026.pdf',
-        tags: ['React', 'Fullstack'],
-        tagInput: '',
-        notes: '',
-        timeline: [{ id: 't-1', stage: 'Applied', date: new Date().toISOString().split('T')[0], notes: 'Submitted application portal.' }],
-        interviews: []
-      });
-    }
-  }, [application, initialStage, isOpen]);
+export default function JobModal({ isOpen, onClose, onSave, application, initialStage = 'applied' }) {
+  const [activeTab, setActiveTab] = useState('info');
+  const [formData, setFormData] = useState(() => createInitialFormData(application, initialStage));
 
   if (!isOpen) return null;
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Scale, Trophy, DollarSign, Award, Check, Sparkles, Building2 } from 'lucide-react';
+import { Scale, Trophy, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 export default function OfferComparer({ applications }) {

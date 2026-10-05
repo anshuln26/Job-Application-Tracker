@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, CheckCircle2, Circle, Plus, MapPin, Building, Video, User } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, Circle, Plus } from 'lucide-react';
 
 export default function CalendarView({ applications, onSelectApp, onToggleInterviewComplete, onAddInterview }) {
   const [selectedAppId, setSelectedAppId] = useState('');
@@ -179,7 +179,16 @@ export default function CalendarView({ applications, onSelectApp, onToggleInterv
 
                       <div>
                         <div style={{ fontWeight: 700, fontSize: '0.925rem' }}>{item.title}</div>
-                        <div style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: 600 }}>{item.company} — {item.jobTitle}</div>
+                        <div
+                          style={{ fontSize: '0.8rem', color: 'var(--accent-primary)', fontWeight: 600, cursor: 'pointer' }}
+                          onClick={() => {
+                            const app = applications.find(a => a.id === item.appId);
+                            if (app && onSelectApp) onSelectApp(app);
+                          }}
+                          title="View job details"
+                        >
+                          {item.company} — {item.jobTitle}
+                        </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <Clock size={12} /> {dateFormatted}
                           <span className="badge" style={{ background: 'var(--status-interview-bg)', color: 'var(--status-interview)', marginLeft: '4px' }}>
@@ -231,7 +240,16 @@ export default function CalendarView({ applications, onSelectApp, onToggleInterv
                     </button>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: '0.875rem', textDecoration: 'line-through' }}>{item.title}</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{item.company}</div>
+                      <div
+                        style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', cursor: 'pointer' }}
+                        onClick={() => {
+                          const app = applications.find(a => a.id === item.appId);
+                          if (app && onSelectApp) onSelectApp(app);
+                        }}
+                        title="View job details"
+                      >
+                        {item.company}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -5,12 +5,9 @@ import {
   Edit2,
   Trash2,
   ExternalLink,
-  DollarSign,
   Filter,
   CheckSquare,
-  Square,
-  FileSpreadsheet,
-  Layers
+  Square
 } from 'lucide-react';
 
 export default function JobTable({
@@ -212,7 +209,6 @@ export default function JobTable({
               </tr>
             ) : (
               filteredApps.map((app) => {
-                const stageObj = STAGES.find(s => s.id === app.status) || STAGES[0];
                 const isSelected = selectedIds.includes(app.id);
 
                 return (
