@@ -9,10 +9,58 @@ import OfferComparer from './components/OfferComparer';
 import JobModal from './components/JobModal';
 import Toast from './components/Toast';
 import ConfirmModal from './components/ConfirmModal';
+import AuthModal from './components/AuthModal';
 import { INITIAL_APPLICATIONS } from './data/mockData';
+import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
 
 const LOCAL_STORAGE_KEY = 'careertrack_apps_v1';
 const THEME_KEY = 'careertrack_theme_v1';
+
+// Helpers to map between DB snake_case and UI camelCase
+const mapToDb = (app, userId) => ({
+  id: app.id,
+  user_id: userId,
+  company: app.company,
+  title: app.title,
+  location: app.location || '',
+  work_type: app.workType || 'Remote',
+  status: app.status,
+  priority: app.priority || 'medium',
+  salary_min: Number(app.salaryMin) || 0,
+  salary_max: Number(app.salaryMax) || 0,
+  currency: app.currency || '$',
+  applied_date: app.appliedDate || new Date().toISOString().split('T')[0],
+  job_url: app.jobUrl || '',
+  contact_name: app.contactName || '',
+  contact_email: app.contactEmail || '',
+  resume_version: app.resumeVersion || '',
+  tags: app.tags || [],
+  notes: app.notes || '',
+  timeline: app.timeline || [],
+  interviews: app.interviews || []
+});
+
+const mapFromDb = (item) => ({
+  id: item.id,
+  company: item.company,
+  title: item.title,
+  location: item.location || '',
+  workType: item.work_type || 'Remote',
+  status: item.status || 'applied',
+  priority: item.priority || 'medium',
+  salaryMin: Number(item.salary_min) || 0,
+  salaryMax: Number(item.salary_max) || 0,
+  currency: item.currency || '$',
+  appliedDate: item.applied_date,
+  jobUrl: item.job_url || '',
+  contactName: item.contact_name || '',
+  contactEmail: item.contact_email || '',
+  resumeVersion: item.resume_version || '',
+  tags: Array.isArray(item.tags) ? item.tags : [],
+  notes: item.notes || '',
+  timeline: Array.isArray(item.timeline) ? item.timeline : [],
+  interviews: Array.isArray(item.interviews) ? item.interviews : []
+});
 
 export default function App() {
   // Load Applications from LocalStorage or Initial Mock Data
@@ -31,6 +79,10 @@ export default function App() {
     return localStorage.getItem(THEME_KEY) || 'dark';
   });
 
+  // User Auth State
+  const [user, setUser] = useState(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
   // UI View States
   const [activeView, setActiveView] = useState('kanban'); // 'kanban', 'table', 'analytics', 'calendar', 'comparer'
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +93,59 @@ export default function App() {
   const [initialStageForModal, setInitialStageForModal] = useState('applied');
   const [toast, setToast] = useState(null);
   const [confirmState, setConfirmState] = useState({ isOpen: false, type: '', id: null });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
+
+  // Sync Auth State
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Fetch from Supabase when user logs in
+  useEffect(() => {
+    if (!user || !supabase) return;
+
+    const fetchSupabaseApps = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('applications')
+          .select('*')
+          .order('applied_date', { ascending: false });
+
+        if (error) throw error;
+        if (data && data.length > 0) {
+          setApplications(data.map(mapFromDb));
+        } else {
+          // If first-time user has no cloud applications, sync initial/local items
+          const localSaved = localStorage.getItem(LOCAL_STORAGE_KEY);
+          const initialLocal = localSaved ? JSON.parse(localSaved) : [];
+          if (initialLocal.length > 0) {
+            const rowsToInsert = initialLocal.map(a => mapToDb(a, user.id));
+            await supabase.from('applications').upsert(rowsToInsert);
+            setApplications(initialLocal);
+            showToast('Synchronized local job data to your Supabase cloud account!');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch from Supabase:', err);
+        showToast('Could not load cloud applications. Using local storage.', 'error');
+      }
+    };
+
+    fetchSupabaseApps();
+  }, [user]);
 
   // Sync LocalStorage & Theme attribute
   useEffect(() => {
@@ -56,10 +161,6 @@ export default function App() {
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-  };
-
   // Filter applications by search query
   const filteredApplications = useMemo(() => {
     if (!searchQuery.trim()) return applications;
@@ -74,7 +175,7 @@ export default function App() {
   }, [applications, searchQuery]);
 
   // CRUD Actions
-  const handleSaveApplication = (appData) => {
+  const handleSaveApplication = async (appData) => {
     setApplications(prev => {
       const exists = prev.some(a => a.id === appData.id);
       if (exists) {
@@ -85,12 +186,23 @@ export default function App() {
         return [appData, ...prev];
       }
     });
+
+    if (user && supabase) {
+      try {
+        const { error } = await supabase.from('applications').upsert(mapToDb(appData, user.id));
+        if (error) throw error;
+      } catch (err) {
+        console.error('Supabase save error:', err);
+        showToast('Saved locally, but cloud sync failed.', 'error');
+      }
+    }
   };
 
-  const handleUpdateStatus = (id, newStatus) => {
+  const handleUpdateStatus = async (id, newStatus) => {
+    let updatedTimeline = [];
     setApplications(prev => prev.map(app => {
       if (app.id === id) {
-        const updatedTimeline = [
+        updatedTimeline = [
           ...(app.timeline || []),
           {
             id: 't-' + Date.now(),
@@ -104,6 +216,21 @@ export default function App() {
       return app;
     }));
     showToast(`Status updated!`);
+
+    if (user && supabase) {
+      try {
+        await supabase
+          .from('applications')
+          .update({
+            status: newStatus,
+            timeline: updatedTimeline,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id);
+      } catch (err) {
+        console.error('Supabase update status error:', err);
+      }
+    }
   };
 
   const handleDeleteApplication = (id) => {
@@ -126,18 +253,32 @@ export default function App() {
     });
   };
 
-  const handleBulkStatusUpdate = (ids, newStatus) => {
+  const handleBulkStatusUpdate = async (ids, newStatus) => {
     setApplications(prev => prev.map(a => ids.includes(a.id) ? { ...a, status: newStatus } : a));
     showToast(`Updated status for ${ids.length} applications.`);
+
+    if (user && supabase) {
+      try {
+        await supabase.from('applications').update({ status: newStatus }).in('id', ids);
+      } catch (err) {
+        console.error('Supabase bulk status error:', err);
+      }
+    }
   };
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     if (confirmState.type === 'delete_one') {
       setApplications(prev => prev.filter(a => a.id !== confirmState.id));
       showToast('Application deleted.', 'info');
+      if (user && supabase) {
+        await supabase.from('applications').delete().eq('id', confirmState.id);
+      }
     } else if (confirmState.type === 'delete_bulk') {
       setApplications(prev => prev.filter(a => !confirmState.id.includes(a.id)));
       showToast(`${confirmState.id.length} applications deleted.`, 'info');
+      if (user && supabase) {
+        await supabase.from('applications').delete().in('id', confirmState.id);
+      }
     } else if (confirmState.type === 'reset') {
       setApplications(INITIAL_APPLICATIONS);
       localStorage.removeItem(LOCAL_STORAGE_KEY);
@@ -153,6 +294,14 @@ export default function App() {
       title: 'Reset to Sample Data?',
       message: 'This will replace all your current entries with the default mock dataset.'
     });
+  };
+
+  const handleSignOut = async () => {
+    if (supabase) {
+      await supabase.auth.signOut();
+      setUser(null);
+      showToast('Signed out of Supabase Cloud.');
+    }
   };
 
   // Export Data to JSON
@@ -188,27 +337,46 @@ export default function App() {
   };
 
   // Interview Handlers
-  const handleToggleInterviewComplete = (appId, interviewId) => {
+  const handleToggleInterviewComplete = async (appId, interviewId) => {
+    let updatedInterviews = [];
     setApplications(prev => prev.map(app => {
       if (app.id === appId) {
-        const updated = (app.interviews || []).map(i => 
+        updatedInterviews = (app.interviews || []).map(i => 
           i.id === interviewId ? { ...i, completed: !i.completed } : i
         );
-        return { ...app, interviews: updated };
+        return { ...app, interviews: updatedInterviews };
       }
       return app;
     }));
     showToast('Interview schedule updated!');
+
+    if (user && supabase) {
+      try {
+        await supabase.from('applications').update({ interviews: updatedInterviews }).eq('id', appId);
+      } catch (err) {
+        console.error('Supabase interview update error:', err);
+      }
+    }
   };
 
-  const handleAddInterview = (appId, newInterview) => {
+  const handleAddInterview = async (appId, newInterview) => {
+    let updatedInterviews = [];
     setApplications(prev => prev.map(app => {
       if (app.id === appId) {
-        return { ...app, interviews: [...(app.interviews || []), newInterview] };
+        updatedInterviews = [...(app.interviews || []), newInterview];
+        return { ...app, interviews: updatedInterviews };
       }
       return app;
     }));
     showToast('Interview added to schedule!');
+
+    if (user && supabase) {
+      try {
+        await supabase.from('applications').update({ interviews: updatedInterviews }).eq('id', appId);
+      } catch (err) {
+        console.error('Supabase add interview error:', err);
+      }
+    }
   };
 
   const handleOpenAddModal = (stage = 'applied') => {
@@ -238,6 +406,10 @@ export default function App() {
         onImportData={handleImportData}
         onResetData={handleResetData}
         totalApps={applications.length}
+        user={user}
+        isConfigured={isSupabaseConfigured()}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onSignOut={handleSignOut}
       />
 
       {/* Main KPI Stats Bar */}
@@ -295,6 +467,17 @@ export default function App() {
           initialStage={initialStageForModal}
         />
       )}
+
+      {/* Supabase Authentication Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onAuthSuccess={(loggedInUser) => {
+          setUser(loggedInUser);
+          setIsAuthModalOpen(false);
+        }}
+        showToast={showToast}
+      />
 
       {/* Confirmation Modal */}
       <ConfirmModal

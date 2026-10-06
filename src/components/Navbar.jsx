@@ -12,7 +12,10 @@ import {
   Upload,
   RotateCcw,
   Search,
-  Scale
+  Scale,
+  Database,
+  LogIn,
+  LogOut
 } from 'lucide-react';
 
 export default function Navbar({
@@ -26,7 +29,11 @@ export default function Navbar({
   onExportData,
   onImportData,
   onResetData,
-  totalApps
+  totalApps,
+  user,
+  isConfigured,
+  onOpenAuthModal,
+  onSignOut
 }) {
   const fileInputRef = useRef(null);
 
@@ -123,6 +130,32 @@ export default function Navbar({
           <button className="btn btn-primary" onClick={onOpenAddModal} style={{ height: '40px' }}>
             <Plus size={18} /> New Job
           </button>
+
+          {/* Supabase Cloud Connection & Auth Status */}
+          {user ? (
+            <button
+              className="btn btn-secondary"
+              onClick={onSignOut}
+              title={`Connected to Supabase as ${user.email}. Click to sign out.`}
+              style={{ height: '40px', gap: '8px', fontSize: '0.825rem' }}
+            >
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--status-offer)' }} />
+              <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user.email.split('@')[0]}
+              </span>
+              <LogOut size={14} style={{ color: 'var(--text-muted)' }} />
+            </button>
+          ) : (
+            <button
+              className="btn btn-secondary"
+              onClick={onOpenAuthModal}
+              title={isConfigured ? 'Sign in to Supabase Cloud' : 'Configure Supabase Database'}
+              style={{ height: '40px', gap: '6px', fontSize: '0.825rem' }}
+            >
+              {isConfigured ? <LogIn size={15} /> : <Database size={15} />}
+              <span>{isConfigured ? 'Cloud Sync' : 'Cloud Setup'}</span>
+            </button>
+          )}
 
           <button
             className="btn btn-secondary btn-icon"
