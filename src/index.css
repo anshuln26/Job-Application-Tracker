@@ -272,3 +272,12 @@ body {
 .pulse-offer {
   animation: pulseGlow 2s infinite ease-in-out;
 }
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.18);
+  }
+}
