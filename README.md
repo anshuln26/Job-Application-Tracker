@@ -102,7 +102,10 @@ This project is configured for one-click continuous deployment with **Vercel** (
 
 ---
 
-## 👤 Author
+<div align="center">
 
-Developed by **[Anshul](https://github.com/anshuln26)**  
-Final Year Project — Job Application Tracker
+### Developed with ❤️ by [Anshul](https://github.com/anshuln26)
+
+*Crafted with love and maintained by [Anshul](https://github.com/anshuln26) • © 2026 All Rights Reserved*
+
+</div>

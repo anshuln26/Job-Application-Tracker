@@ -10,6 +10,7 @@ import JobModal from './components/JobModal';
 import Toast from './components/Toast';
 import ConfirmModal from './components/ConfirmModal';
 import AuthModal from './components/AuthModal';
+import Footer from './components/Footer';
 import { INITIAL_APPLICATIONS } from './data/mockData';
 import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
 
@@ -391,7 +392,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 20px 40px 20px' }}>
+    <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 20px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
       {/* Top Navbar */}
       <Navbar
@@ -416,7 +417,7 @@ export default function App() {
       <StatsOverview applications={applications} />
 
       {/* Views Container */}
-      <main className="animate-fade-in">
+      <main className="animate-fade-in" style={{ flex: 1 }}>
         {activeView === 'kanban' && (
           <KanbanBoard
             applications={filteredApplications}
@@ -455,6 +456,9 @@ export default function App() {
           <OfferComparer applications={applications} />
         )}
       </main>
+
+      {/* Footer */}
+      <Footer />
 
       {/* Application Add/Edit Modal */}
       {isModalOpen && (
