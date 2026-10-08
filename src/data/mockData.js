@@ -1,9 +1,18 @@
 export const STAGES = [
   { id: 'wishlist', label: 'Wishlist', icon: 'Bookmark', color: 'var(--status-wishlist)', bg: 'var(--status-wishlist-bg)' },
+  { id: 'referral', label: 'Waiting for Referral', icon: 'Users', color: 'var(--status-referral)', bg: 'var(--status-referral-bg)' },
   { id: 'applied', label: 'Applied', icon: 'Send', color: 'var(--status-applied)', bg: 'var(--status-applied-bg)' },
   { id: 'interviewing', label: 'Interviewing', icon: 'Calendar', color: 'var(--status-interview)', bg: 'var(--status-interview-bg)' },
   { id: 'offer', label: 'Offer Received', icon: 'Trophy', color: 'var(--status-offer)', bg: 'var(--status-offer-bg)' },
   { id: 'rejected', label: 'Rejected', icon: 'XCircle', color: 'var(--status-rejected)', bg: 'var(--status-rejected-bg)' },
+];
+
+export const REFERRAL_STATUSES = [
+  { id: 'none', label: 'None (Direct Apply)', color: 'var(--text-muted)' },
+  { id: 'connection_pending', label: 'Connection Request Sent (Waiting on LinkedIn)', color: '#F59E0B' },
+  { id: 'connected_waiting', label: 'Connected — Awaiting Referral Response', color: '#3B82F6' },
+  { id: 'referral_received', label: 'Referral Received 🎉', color: '#10B981' },
+  { id: 'declined', label: 'Declined / No Response', color: '#EF4444' }
 ];
 
 export const WORK_TYPES = ['Remote', 'Hybrid', 'Onsite'];
