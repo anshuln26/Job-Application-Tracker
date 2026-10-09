@@ -24,6 +24,8 @@
   /* Status Colors */
   --status-wishlist: #8B5CF6;
   --status-wishlist-bg: rgba(139, 92, 246, 0.12);
+  --status-referral: #EC4899;
+  --status-referral-bg: rgba(236, 72, 153, 0.14);
   --status-applied: #3B82F6;
   --status-applied-bg: rgba(59, 130, 246, 0.12);
   --status-interview: #F59E0B;
@@ -71,6 +73,7 @@
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.12);
 
   --status-wishlist-bg: rgba(139, 92, 246, 0.1);
+  --status-referral-bg: rgba(236, 72, 153, 0.12);
   --status-applied-bg: rgba(59, 130, 246, 0.1);
   --status-interview-bg: rgba(245, 158, 11, 0.12);
   --status-offer-bg: rgba(16, 185, 129, 0.12);
