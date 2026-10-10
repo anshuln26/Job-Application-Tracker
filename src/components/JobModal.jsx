@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Calendar, User, FileText, Briefcase } from 'lucide-react';
-import { STAGES, WORK_TYPES, PRIORITIES } from '../data/mockData';
+import { X, Plus, Trash2, Calendar, User, FileText, Briefcase, Users, Clock, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { STAGES, WORK_TYPES, PRIORITIES, REFERRAL_STATUSES } from '../data/mockData';
 
 const createInitialFormData = (application, initialStage) => {
   if (application) {
     return {
       ...application,
+      plannedApplyDate: application.plannedApplyDate || '',
+      deadline: application.deadline || '',
+      referralStatus: application.referralStatus || 'none',
+      referralContact: application.referralContact || '',
+      referralRole: application.referralRole || '',
+      referralLinkedin: application.referralLinkedin || '',
+      referralDate: application.referralDate || '',
       tagInput: '',
       tags: application.tags || [],
       timeline: application.timeline || [],
@@ -24,7 +31,14 @@ const createInitialFormData = (application, initialStage) => {
     salaryMin: 120000,
     salaryMax: 150000,
     currency: '$',
-    appliedDate: today,
+    appliedDate: initialStage === 'applied' ? today : '',
+    plannedApplyDate: initialStage === 'wishlist' || initialStage === 'referral' ? today : '',
+    deadline: '',
+    referralStatus: initialStage === 'referral' ? 'connection_pending' : 'none',
+    referralContact: '',
+    referralRole: '',
+    referralLinkedin: '',
+    referralDate: initialStage === 'referral' ? today : '',
     jobUrl: '',
     contactName: '',
     contactEmail: '',
@@ -32,7 +46,11 @@ const createInitialFormData = (application, initialStage) => {
     tags: ['React', 'Fullstack'],
     tagInput: '',
     notes: '',
-    timeline: [{ id: 't-1', stage: 'Applied', date: today, notes: 'Submitted application portal.' }],
+    timeline: initialStage === 'applied'
+      ? [{ id: 't-1', stage: 'Applied', date: today, notes: 'Submitted application portal.' }]
+      : initialStage === 'referral'
+      ? [{ id: 't-1', stage: 'Connection Request Sent', date: today, notes: 'Sent connection request on LinkedIn.' }]
+      : [],
     interviews: []
   };
 };
