@@ -170,7 +170,8 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
           gap: '16px'
         }}>
           {[
-            { id: 'info', label: 'Basic Info', icon: Briefcase },
+            { id: 'info', label: 'Basic Info & Dates', icon: Briefcase },
+            { id: 'referral', label: 'Referral & Networking', icon: Users, badge: formData.referralStatus && formData.referralStatus !== 'none' },
             { id: 'contact', label: 'Contact & Resume', icon: User },
             { id: 'timeline', label: 'Milestones', icon: Calendar },
             { id: 'notes', label: 'Notes & Tags', icon: FileText }
