@@ -297,12 +297,49 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                 />
               </div>
 
+              {/* Planned Apply Date */}
               <div className="form-group">
-                <label className="form-label">Applied Date</label>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Calendar size={13} style={{ color: 'var(--status-wishlist)' }} />
+                  <span>Planned Apply Date</span>
+                </label>
                 <input
                   type="date"
                   className="form-input"
-                  value={formData.appliedDate}
+                  value={formData.plannedApplyDate || ''}
+                  onChange={(e) => handleChange('plannedApplyDate', e.target.value)}
+                />
+              </div>
+
+              {/* Application Deadline */}
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Clock size={13} style={{ color: 'var(--status-rejected)' }} />
+                  <span>Application Deadline</span>
+                  {formData.deadline && (
+                    <span style={{ fontSize: '0.7rem', color: 'var(--status-rejected)', marginLeft: 'auto', fontWeight: 600 }}>
+                      ⚠️ Active Alert
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={formData.deadline || ''}
+                  onChange={(e) => handleChange('deadline', e.target.value)}
+                />
+              </div>
+
+              {/* Actual Applied Date */}
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <CheckCircle2 size={13} style={{ color: 'var(--status-applied)' }} />
+                  <span>Actual Applied Date</span>
+                </label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={formData.appliedDate || ''}
                   onChange={(e) => handleChange('appliedDate', e.target.value)}
                 />
               </div>
@@ -318,6 +355,110 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                 />
               </div>
 
+            </div>
+          )}
+
+          {/* TAB: REFERRAL & NETWORKING */}
+          {activeTab === 'referral' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{
+                background: 'rgba(236, 72, 153, 0.08)',
+                border: '1px solid rgba(236, 72, 153, 0.25)',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 16px',
+                fontSize: '0.825rem',
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <Users size={20} style={{ color: 'var(--status-referral)', flexShrink: 0 }} />
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>LinkedIn Referral & Networking Tracker:</strong>{' '}
+                  Track connection requests sent to company employees before applying. Set status to "Connection Request Sent" to track pending days and prevent missed deadlines!
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Referral / Outreach Status</label>
+                  <select
+                    className="form-select"
+                    value={formData.referralStatus || 'none'}
+                    onChange={(e) => handleChange('referralStatus', e.target.value)}
+                  >
+                    {REFERRAL_STATUSES.map(rs => (
+                      <option key={rs.id} value={rs.id}>{rs.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Connection Request Sent Date</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={formData.referralDate || ''}
+                    onChange={(e) => handleChange('referralDate', e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Referrer / Employee Name</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Marcus Vance"
+                    value={formData.referralContact || ''}
+                    onChange={(e) => handleChange('referralContact', e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Employee Title / Role</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Senior Software Engineer at OpenAI"
+                    value={formData.referralRole || ''}
+                    onChange={(e) => handleChange('referralRole', e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label className="form-label" style={{ marginBottom: 0 }}>LinkedIn Profile URL</label>
+                    {formData.referralLinkedin && (
+                      <a
+                        href={formData.referralLinkedin.startsWith('http') ? formData.referralLinkedin : `https://${formData.referralLinkedin}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                      >
+                        Open LinkedIn Profile <ExternalLink size={12} />
+                      </a>
+                    )}
+                  </div>
+                  <input
+                    type="url"
+                    className="form-input"
+                    placeholder="https://www.linkedin.com/in/username"
+                    value={formData.referralLinkedin || ''}
+                    onChange={(e) => handleChange('referralLinkedin', e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label">Outreach / Referral Notes</label>
+                  <textarea
+                    className="form-textarea"
+                    rows="3"
+                    placeholder="e.g. Sent personalized connection request on Oct 20 mentioning their work on WebGPU. Waiting for acceptance before asking for referral link."
+                    value={formData.referralNotes || ''}
+                    onChange={(e) => handleChange('referralNotes', e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
           )}
 
