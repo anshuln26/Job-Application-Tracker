@@ -7,8 +7,22 @@ import {
   ExternalLink,
   Filter,
   CheckSquare,
-  Square
+  Square,
+  Clock,
+  Calendar,
+  AlertTriangle,
+  Users
 } from 'lucide-react';
+
+const getDaysUntil = (dateStr) => {
+  if (!dateStr) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr);
+  d.setHours(0, 0, 0, 0);
+  const diffTime = d - today;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
 
 export default function JobTable({
   applications,
@@ -28,7 +42,13 @@ export default function JobTable({
   // Filter & Sort Logic
   const filteredApps = useMemo(() => {
     return applications.filter(app => {
-      if (statusFilter !== 'all' && app.status !== statusFilter) return false;
+      if (statusFilter === 'pending_apply') {
+        if (app.status !== 'wishlist' && app.status !== 'referral') return false;
+      } else if (statusFilter === 'has_deadline') {
+        if (!app.deadline) return false;
+      } else if (statusFilter !== 'all' && app.status !== statusFilter) {
+        return false;
+      }
       if (workTypeFilter !== 'all' && app.workType !== workTypeFilter) return false;
       if (priorityFilter !== 'all' && app.priority !== priorityFilter) return false;
       return true;
@@ -39,6 +59,11 @@ export default function JobTable({
       if (sortField === 'salary') {
         aVal = a.salaryMax || 0;
         bVal = b.salaryMax || 0;
+      }
+
+      if (sortField === 'deadline') {
+        aVal = a.deadline || '9999-99-99';
+        bVal = b.deadline || '9999-99-99';
       }
 
       if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
