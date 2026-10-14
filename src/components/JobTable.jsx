@@ -120,9 +120,11 @@ export default function JobTable({
             className="form-select"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ width: '140px', padding: '6px 10px', fontSize: '0.825rem' }}
+            style={{ width: '165px', padding: '6px 10px', fontSize: '0.825rem' }}
           >
             <option value="all">All Statuses</option>
+            <option value="pending_apply">⚠️ Pending to Apply</option>
+            <option value="has_deadline">⏰ With Deadlines</option>
             {STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
           </select>
 
@@ -215,12 +217,15 @@ export default function JobTable({
               <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('priority')}>
                 Priority <ArrowUpDown size={13} />
               </th>
+              <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('deadline')}>
+                Deadline <ArrowUpDown size={13} />
+              </th>
+              <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('appliedDate')}>
+                Dates <ArrowUpDown size={13} />
+              </th>
               <th style={{ padding: '12px' }}>Work Type</th>
               <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('salary')}>
                 Salary <ArrowUpDown size={13} />
-              </th>
-              <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('appliedDate')}>
-                Applied Date <ArrowUpDown size={13} />
               </th>
               <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
             </tr>
@@ -228,7 +233,7 @@ export default function JobTable({
           <tbody>
             {filteredApps.length === 0 ? (
               <tr>
-                <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                   No job applications match your current filters.
                 </td>
               </tr>
@@ -253,7 +258,24 @@ export default function JobTable({
                         : <Square size={18} style={{ color: 'var(--text-muted)' }} />}
                     </td>
                     <td style={{ padding: '12px' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{app.company}</div>
+                      <div style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        {app.company}
+                        {(app.status === 'referral' || app.referralStatus === 'connection_pending') && (
+                          <span style={{
+                            background: 'rgba(236, 72, 153, 0.14)',
+                            color: '#EC4899',
+                            fontSize: '0.68rem',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}>
+                            <Users size={10} /> Referral Pending
+                          </span>
+                        )}
+                      </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{app.title}</div>
                     </td>
                     <td style={{ padding: '12px' }}>
@@ -278,6 +300,51 @@ export default function JobTable({
                       <span className={`badge badge-${app.priority}`}>
                         {app.priority}
                       </span>
+                    </td>
+                    {/* Deadline Column */}
+                    <td style={{ padding: '12px' }}>
+                      {(() => {
+                        if (!app.deadline) return <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>None</span>;
+                        const days = getDaysUntil(app.deadline);
+                        if (days < 0) {
+                          return (
+                            <span style={{ color: '#EF4444', fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <AlertTriangle size={12} /> Expired ({app.deadline})
+                            </span>
+                          );
+                        }
+                        if (days === 0) {
+                          return (
+                            <span style={{ color: '#EF4444', fontSize: '0.78rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px', animation: 'pulse 1.8s infinite' }}>
+                              <AlertTriangle size={12} /> 🚨 TODAY!
+                            </span>
+                          );
+                        }
+                        if (days <= 3) {
+                          return (
+                            <span style={{ color: '#F59E0B', fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              <Clock size={12} /> ⚠️ {days}d left ({app.deadline})
+                            </span>
+                          );
+                        }
+                        return (
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <Clock size={12} /> {app.deadline} ({days}d)
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    {/* Dates Column */}
+                    <td style={{ padding: '12px', fontSize: '0.825rem' }}>
+                      {app.appliedDate ? (
+                        <span style={{ color: 'var(--text-primary)' }}>Applied {app.appliedDate}</span>
+                      ) : app.plannedApplyDate ? (
+                        <span style={{ color: 'var(--status-wishlist)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Calendar size={12} /> Plan: {app.plannedApplyDate}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>Draft</span>
+                      )}
                     </td>
                     <td style={{ padding: '12px', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
                       {app.workType} ({app.location || 'Remote'})
