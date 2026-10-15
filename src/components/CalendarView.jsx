@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, CheckCircle2, Circle, Plus } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, Circle, Plus, AlertTriangle, Users } from 'lucide-react';
 
 export default function CalendarView({ applications, onSelectApp, onToggleInterviewComplete, onAddInterview }) {
   const [selectedAppId, setSelectedAppId] = useState('');
@@ -7,6 +7,50 @@ export default function CalendarView({ applications, onSelectApp, onToggleInterv
   const [interviewDate, setInterviewDate] = useState('');
   const [interviewType, setInterviewType] = useState('Technical Round');
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Extract application deadlines
+  const deadlineEvents = applications
+    .filter(app => app.deadline)
+    .map(app => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const d = new Date(app.deadline);
+      d.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+      return {
+        id: 'dl-' + app.id,
+        appId: app.id,
+        company: app.company,
+        jobTitle: app.title,
+        date: app.deadline,
+        diffDays,
+        status: app.status,
+        type: 'Application Deadline'
+      };
+    })
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  // Extract planned apply dates for unapplied jobs
+  const plannedEvents = applications
+    .filter(app => app.plannedApplyDate && (app.status === 'wishlist' || app.status === 'referral'))
+    .map(app => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const d = new Date(app.plannedApplyDate);
+      d.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+      return {
+        id: 'pl-' + app.id,
+        appId: app.id,
+        company: app.company,
+        jobTitle: app.title,
+        date: app.plannedApplyDate,
+        diffDays,
+        status: app.status,
+        type: 'Planned Apply Date'
+      };
+    })
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   // Flatten all interviews from applications
   const allInterviews = applications.flatMap(app => 
@@ -129,9 +173,102 @@ export default function CalendarView({ applications, onSelectApp, onToggleInterv
         </div>
       )}
 
-      {/* Grid: Upcoming vs Completed */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+      {/* Grid: Deadlines vs Upcoming Interviews vs Completed */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(310px, 1fr))', gap: '20px' }}>
         
+        {/* Deadlines & Application Targets */}
+        <div className="glass-panel" style={{ padding: '20px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', color: 'var(--status-rejected)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={18} /> Deadlines & Planned Targets ({deadlineEvents.length + plannedEvents.length})
+          </h3>
+
+          {deadlineEvents.length === 0 && plannedEvents.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              No upcoming deadlines or planned apply dates.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {/* Deadlines */}
+              {deadlineEvents.map(item => {
+                const isOverdue = item.diffDays < 0;
+                const isToday = item.diffDays === 0;
+                const isUrgent = item.diffDays > 0 && item.diffDays <= 3;
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      const app = applications.find(a => a.id === item.appId);
+                      if (app && onSelectApp) onSelectApp(app);
+                    }}
+                    style={{
+                      background: 'var(--bg-surface)',
+                      border: isToday || isOverdue ? '1px solid rgba(239, 68, 68, 0.5)' : isUrgent ? '1px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border-color)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '12px 14px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '10px'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                        {item.company} — {item.jobTitle}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={12} /> Deadline: {item.date}
+                        <span className="badge" style={{
+                          background: isToday || isOverdue ? 'rgba(239, 68, 68, 0.2)' : isUrgent ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-glass)',
+                          color: isToday || isOverdue ? '#EF4444' : isUrgent ? '#F59E0B' : 'var(--text-secondary)'
+                        }}>
+                          {isOverdue ? `Closed (${Math.abs(item.diffDays)}d ago)` : isToday ? '🚨 DUE TODAY' : `${item.diffDays}d left`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Planned Apply Dates */}
+              {plannedEvents.map(item => (
+                <div
+                  key={item.id}
+                  onClick={() => {
+                    const app = applications.find(a => a.id === item.appId);
+                    if (app && onSelectApp) onSelectApp(app);
+                  }}
+                  style={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '12px 14px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '10px'
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+                      {item.company} — {item.jobTitle}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Calendar size={12} style={{ color: 'var(--status-wishlist)' }} />
+                      <span>Target Apply: {item.date}</span>
+                      <span className="badge" style={{ background: 'var(--status-wishlist-bg)', color: 'var(--status-wishlist)' }}>
+                        {item.status === 'referral' ? 'Waiting on Referral' : 'Wishlist Target'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Upcoming */}
         <div className="glass-panel" style={{ padding: '20px' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', color: 'var(--status-interview)', display: 'flex', alignItems: 'center', gap: '8px' }}>
