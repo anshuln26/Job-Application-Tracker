@@ -4,7 +4,8 @@ import confetti from 'canvas-confetti';
 
 export default function StatsOverview({ applications }) {
   const total = applications.length;
-  const appliedCount = applications.filter(a => a.status !== 'wishlist').length;
+  const appliedCount = applications.filter(a => a.status !== 'wishlist' && a.status !== 'referral').length;
+  const pendingApplyCount = applications.filter(a => a.status === 'wishlist' || a.status === 'referral').length;
   const interviewingCount = applications.filter(a => a.status === 'interviewing').length;
   const offerCount = applications.filter(a => a.status === 'offer').length;
   
@@ -46,7 +47,7 @@ export default function StatsOverview({ applications }) {
           </div>
         </div>
         <div style={{ marginTop: '12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-          {appliedCount} submitted · {applications.filter(a => a.status === 'wishlist').length} saved
+          {appliedCount} submitted · <span style={{ color: pendingApplyCount > 0 ? 'var(--status-interview)' : 'inherit', fontWeight: 600 }}>{pendingApplyCount} pending to apply</span>
         </div>
       </div>
 
