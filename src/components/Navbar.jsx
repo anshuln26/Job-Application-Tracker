@@ -33,7 +33,9 @@ export default function Navbar({
   user,
   isConfigured,
   onOpenAuthModal,
-  onSignOut
+  onSignOut,
+  displayCurrency = 'INR',
+  setDisplayCurrency
 }) {
   const fileInputRef = useRef(null);
 
@@ -127,6 +129,76 @@ export default function Navbar({
 
         {/* Action Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          
+          {/* Currency Toggle Switcher (INR / USD) */}
+          {setDisplayCurrency && (
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                padding: '3px',
+                gap: '2px',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+              }}
+              role="group"
+              aria-label="Currency selection"
+            >
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setDisplayCurrency('INR')}
+                title="Display all salaries in Indian Rupee (₹ / LPA)"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.78rem',
+                  fontWeight: displayCurrency === 'INR' ? 700 : 500,
+                  background: displayCurrency === 'INR' ? 'var(--accent-primary)' : 'transparent',
+                  color: displayCurrency === 'INR' ? '#fff' : 'var(--text-secondary)',
+                  borderRadius: '7px',
+                  border: 'none',
+                  height: '32px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: displayCurrency === 'INR' ? '0 2px 8px var(--accent-glow)' : 'none'
+                }}
+              >
+                <span>🇮🇳</span>
+                <span>₹ INR</span>
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setDisplayCurrency('USD')}
+                title="Display all salaries in US Dollar ($)"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.78rem',
+                  fontWeight: displayCurrency === 'USD' ? 700 : 500,
+                  background: displayCurrency === 'USD' ? 'var(--accent-primary)' : 'transparent',
+                  color: displayCurrency === 'USD' ? '#fff' : 'var(--text-secondary)',
+                  borderRadius: '7px',
+                  border: 'none',
+                  height: '32px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: displayCurrency === 'USD' ? '0 2px 8px var(--accent-glow)' : 'none'
+                }}
+              >
+                <span>🇺🇸</span>
+                <span>$ USD</span>
+              </button>
+            </div>
+          )}
+
           <button className="btn btn-primary" onClick={onOpenAddModal} style={{ height: '40px' }}>
             <Plus size={18} /> New Job
           </button>
