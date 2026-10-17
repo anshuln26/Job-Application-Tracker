@@ -8,6 +8,7 @@ import { Lightbulb, TrendingUp, DollarSign, Award, Compass } from 'lucide-react'
 
 const STAGE_COLORS = {
   wishlist: '#8B5CF6',
+  referral: '#EC4899',
   applied: '#3B82F6',
   interviewing: '#F59E0B',
   offer: '#10B981',

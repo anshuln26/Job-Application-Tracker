@@ -32,6 +32,15 @@ CREATE TABLE IF NOT EXISTS public.applications (
 -- 2. Enable Row Level Security (RLS)
 ALTER TABLE public.applications ENABLE ROW LEVEL SECURITY;
 
+-- 2.1 Add Deadline, Planned Apply Date & Referral Tracking Columns (Safe for existing tables)
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS deadline DATE;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS planned_apply_date DATE;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS referral_status TEXT DEFAULT 'none';
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS referral_contact TEXT;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS referral_role TEXT;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS referral_linkedin TEXT;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS referral_date DATE;
+
 -- 3. RLS Policies: Ensure users can only access their own data
 DROP POLICY IF EXISTS "Users can view their own applications" ON public.applications;
 CREATE POLICY "Users can view their own applications"

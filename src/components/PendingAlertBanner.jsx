@@ -6,11 +6,9 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
-  CheckCircle2,
   Calendar,
   Send,
-  Flame,
-  ArrowRight
+  Flame
 } from 'lucide-react';
 
 const getDaysUntil = (dateStr) => {
