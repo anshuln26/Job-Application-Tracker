@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Scale, Trophy, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { convertSalary, formatSalaryRange } from '../utils/currency';
 
-export default function OfferComparer({ applications }) {
+export default function OfferComparer({ applications, displayCurrency = 'INR' }) {
   const offerApps = applications.filter(a => a.status === 'offer' || a.status === 'interviewing');
 
   // Interactive evaluation state for each offer (defaults to reasonable score)
@@ -23,7 +24,9 @@ export default function OfferComparer({ applications }) {
   };
 
   const calculateTotalScore = (app) => {
-    const salaryScore = (app.salaryMax / 200000) * 30; // Max 30 pts for salary
+    // Normalize salary to USD equivalent for standard scoring (200k USD / ~1.7 Cr INR = 30 pts)
+    const normalizedUSD = convertSalary(app.salaryMax, app.currency, 'USD');
+    const salaryScore = Math.min(30, (normalizedUSD / 200000) * 30);
     const flexScore = getRating(app.id, 'flexibility', 7) * 2; // Max 20 pts
     const cultureScore = getRating(app.id, 'culture', 8) * 2.5; // Max 25 pts
     const growthScore = getRating(app.id, 'growth', 7) * 2.5; // Max 25 pts
@@ -143,11 +146,27 @@ export default function OfferComparer({ applications }) {
 
                 {/* Base Details */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', marginBottom: '16px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Salary Range:</span>
-                    <strong style={{ color: 'var(--status-offer)' }}>
-                      ${(app.salaryMin/1000).toFixed(0)}k - ${(app.salaryMax/1000).toFixed(0)}k
-                    </strong>
+                    <div style={{ textAlign: 'right' }}>
+                      <strong style={{ color: 'var(--status-offer)' }}>
+                        {(() => {
+                          const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency);
+                          return sal.formatted;
+                        })()}
+                      </strong>
+                      {(() => {
+                        const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency);
+                        if (sal.isConverted) {
+                          return (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                              Orig: {sal.original}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Work Model:</span>
