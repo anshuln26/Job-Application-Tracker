@@ -67,7 +67,7 @@ const mapToDb = (app, userId) => ({
   priority: app.priority || 'medium',
   salary_min: Number(app.salaryMin) || 0,
   salary_max: Number(app.salaryMax) || 0,
-  currency: app.currency || '$',
+  currency: app.currency || 'INR',
   applied_date: app.appliedDate || (app.plannedApplyDate || new Date().toISOString().split('T')[0]),
   job_url: app.jobUrl || '',
   contact_name: app.contactName || '',
@@ -75,6 +75,7 @@ const mapToDb = (app, userId) => ({
   resume_version: app.resumeVersion || '',
   tags: app.tags || [],
   notes: serializeNotesWithMeta(app.notes, {
+    currency: app.currency,
     deadline: app.deadline,
     plannedApplyDate: app.plannedApplyDate,
     referralStatus: app.referralStatus,
@@ -100,7 +101,7 @@ const mapFromDb = (item) => {
     priority: item.priority || 'medium',
     salaryMin: Number(item.salary_min) || 0,
     salaryMax: Number(item.salary_max) || 0,
-    currency: item.currency || '$',
+    currency: item.currency || meta.currency || 'INR',
     appliedDate: item.applied_date,
     plannedApplyDate: item.planned_apply_date || meta.plannedApplyDate || '',
     deadline: item.deadline || meta.deadline || '',
@@ -137,6 +138,16 @@ export default function App() {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem(THEME_KEY) || 'dark';
   });
+
+  // Display Currency State ('INR' by default for Indian residents, or 'USD')
+  const CURRENCY_KEY = 'careertrack_preferred_currency';
+  const [displayCurrency, setDisplayCurrency] = useState(() => {
+    return localStorage.getItem(CURRENCY_KEY) || 'INR';
+  });
+
+  useEffect(() => {
+    localStorage.setItem(CURRENCY_KEY, displayCurrency);
+  }, [displayCurrency]);
 
   // User Auth State
   const [user, setUser] = useState(null);
@@ -469,10 +480,16 @@ export default function App() {
         isConfigured={isSupabaseConfigured()}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onSignOut={handleSignOut}
+        displayCurrency={displayCurrency}
+        setDisplayCurrency={setDisplayCurrency}
       />
 
       {/* Main KPI Stats Bar */}
-      <StatsOverview applications={applications} />
+      <StatsOverview
+        applications={applications}
+        displayCurrency={displayCurrency}
+        onToggleCurrency={setDisplayCurrency}
+      />
 
       {/* Smart Alert & Warning Indication for Applications Pending to Apply */}
       <PendingAlertBanner
@@ -490,6 +507,7 @@ export default function App() {
             onUpdateStatus={handleUpdateStatus}
             onDeleteApp={handleDeleteApplication}
             onOpenAddModalWithStage={handleOpenAddModal}
+            displayCurrency={displayCurrency}
           />
         )}
 
@@ -501,11 +519,15 @@ export default function App() {
             onDeleteApp={handleDeleteApplication}
             onBulkDelete={handleBulkDelete}
             onBulkStatusUpdate={handleBulkStatusUpdate}
+            displayCurrency={displayCurrency}
           />
         )}
 
         {activeView === 'analytics' && (
-          <AnalyticsView applications={applications} />
+          <AnalyticsView
+            applications={applications}
+            displayCurrency={displayCurrency}
+          />
         )}
 
         {activeView === 'calendar' && (
@@ -518,7 +540,10 @@ export default function App() {
         )}
 
         {activeView === 'comparer' && (
-          <OfferComparer applications={applications} />
+          <OfferComparer
+            applications={applications}
+            displayCurrency={displayCurrency}
+          />
         )}
       </main>
 
@@ -534,6 +559,7 @@ export default function App() {
           onSave={handleSaveApplication}
           application={editingApp}
           initialStage={initialStageForModal}
+          displayCurrency={displayCurrency}
         />
       )}
 

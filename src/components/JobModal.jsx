@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, Calendar, User, FileText, Briefcase, Users, Clock, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { STAGES, WORK_TYPES, PRIORITIES, REFERRAL_STATUSES } from '../data/mockData';
+import { SUPPORTED_CURRENCIES, formatSalaryRange } from '../utils/currency';
 
-const createInitialFormData = (application, initialStage) => {
+const createInitialFormData = (application, initialStage, displayCurrency = 'INR') => {
   if (application) {
     return {
       ...application,
+      currency: application.currency || displayCurrency || 'INR',
       plannedApplyDate: application.plannedApplyDate || '',
       deadline: application.deadline || '',
       referralStatus: application.referralStatus || 'none',
@@ -20,6 +22,7 @@ const createInitialFormData = (application, initialStage) => {
     };
   }
   const today = new Date().toISOString().split('T')[0];
+  const isINR = (displayCurrency || 'INR') === 'INR';
   return {
     id: 'job-' + Date.now(),
     company: '',
@@ -28,9 +31,9 @@ const createInitialFormData = (application, initialStage) => {
     workType: 'Remote',
     status: initialStage || 'applied',
     priority: 'medium',
-    salaryMin: 120000,
-    salaryMax: 150000,
-    currency: '$',
+    salaryMin: isINR ? 1800000 : 120000,
+    salaryMax: isINR ? 2800000 : 150000,
+    currency: displayCurrency || 'INR',
     appliedDate: initialStage === 'applied' ? today : '',
     plannedApplyDate: initialStage === 'wishlist' || initialStage === 'referral' ? today : '',
     deadline: '',
@@ -55,9 +58,9 @@ const createInitialFormData = (application, initialStage) => {
   };
 };
 
-export default function JobModal({ isOpen, onClose, onSave, application, initialStage = 'applied' }) {
+export default function JobModal({ isOpen, onClose, onSave, application, initialStage = 'applied', displayCurrency = 'INR' }) {
   const [activeTab, setActiveTab] = useState('info');
-  const [formData, setFormData] = useState(() => createInitialFormData(application, initialStage));
+  const [formData, setFormData] = useState(() => createInitialFormData(application, initialStage, displayCurrency));
 
   if (!isOpen) return null;
 
@@ -277,25 +280,87 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                 />
               </div>
 
+              {/* Currency Selector */}
               <div className="form-group">
-                <label className="form-label">Min Salary ($/yr)</label>
+                <label className="form-label">Salary Currency</label>
+                <select
+                  className="form-input"
+                  value={formData.currency || 'INR'}
+                  onChange={(e) => handleChange('currency', e.target.value)}
+                >
+                  {SUPPORTED_CURRENCIES.map(c => (
+                    <option key={c.code} value={c.code}>
+                      {c.flag} {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Min Salary */}
+              <div className="form-group">
+                <label className="form-label">
+                  Min Salary {formData.currency === 'INR' ? '(₹ Raw / LPA)' : `(${formData.currency || '$'}/yr)`}
+                </label>
                 <input
                   type="number"
                   className="form-input"
+                  placeholder={formData.currency === 'INR' ? 'e.g. 1800000 (18 LPA)' : 'e.g. 120000'}
                   value={formData.salaryMin}
                   onChange={(e) => handleChange('salaryMin', Number(e.target.value))}
                 />
               </div>
 
+              {/* Max Salary */}
               <div className="form-group">
-                <label className="form-label">Max Salary ($/yr)</label>
+                <label className="form-label">
+                  Max Salary {formData.currency === 'INR' ? '(₹ Raw / LPA)' : `(${formData.currency || '$'}/yr)`}
+                </label>
                 <input
                   type="number"
                   className="form-input"
+                  placeholder={formData.currency === 'INR' ? 'e.g. 2800000 (28 LPA)' : 'e.g. 150000'}
                   value={formData.salaryMax}
                   onChange={(e) => handleChange('salaryMax', Number(e.target.value))}
                 />
               </div>
+
+              {/* Live Conversion Preview Banner */}
+              {(formData.salaryMin > 0 || formData.salaryMax > 0) && (
+                <div style={{
+                  gridColumn: '1 / -1',
+                  background: 'var(--bg-glass)',
+                  border: '1px dashed var(--border-color)',
+                  padding: '10px 14px',
+                  borderRadius: '10px',
+                  fontSize: '0.78rem',
+                  color: 'var(--text-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>💱</span>
+                    <strong>
+                      {formData.currency === 'INR' ? 'USD Equivalent ($):' : 'INR Equivalent (₹):'}
+                    </strong>
+                    <span style={{ color: 'var(--status-offer)', fontWeight: 700 }}>
+                      {formatSalaryRange(
+                        formData.salaryMin,
+                        formData.salaryMax,
+                        formData.currency || 'INR',
+                        formData.currency === 'INR' ? 'USD' : 'INR'
+                      ).formatted}
+                    </span>
+                  </div>
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
+                    {formData.currency === 'INR'
+                      ? `(${formData.salaryMin >= 100000 ? (formData.salaryMin / 100000).toFixed(1) : 0} - ${formData.salaryMax >= 100000 ? (formData.salaryMax / 100000).toFixed(1) : 0} LPA)`
+                      : '(Rate: 1 USD ≈ ₹84.50 INR)'}
+                  </span>
+                </div>
+              )}
 
               {/* Planned Apply Date */}
               <div className="form-group">
