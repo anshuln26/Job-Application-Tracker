@@ -1,5 +1,5 @@
 import React from 'react';
-import { Send, Calendar, Trophy, Percent, DollarSign, Sparkles } from 'lucide-react';
+import { Send, Calendar, Trophy, Percent, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { convertSalary, formatSingleSalary } from '../utils/currency';
 

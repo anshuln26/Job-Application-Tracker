@@ -11,7 +11,6 @@ import {
   Send,
   Trophy,
   XCircle,
-  DollarSign,
   Clock,
   AlertTriangle,
   ExternalLink
