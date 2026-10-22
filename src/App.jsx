@@ -11,11 +11,49 @@ import Toast from './components/Toast';
 import ConfirmModal from './components/ConfirmModal';
 import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
+import PendingAlertBanner from './components/PendingAlertBanner';
 import { INITIAL_APPLICATIONS } from './data/mockData';
 import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
 
 const LOCAL_STORAGE_KEY = 'careertrack_apps_v1';
 const THEME_KEY = 'careertrack_theme_v1';
+
+const META_TAG_START = '<!-- CT_META:';
+const META_TAG_END = ':CT_META -->';
+
+const serializeNotesWithMeta = (notesText, meta) => {
+  const cleanNotes = (notesText || '').replace(/<!-- CT_META:[\s\S]*?:CT_META -->/g, '').trim();
+  const metaPayload = {
+    deadline: meta.deadline || null,
+    plannedApplyDate: meta.plannedApplyDate || null,
+    referralStatus: meta.referralStatus || 'none',
+    referralContact: meta.referralContact || null,
+    referralRole: meta.referralRole || null,
+    referralLinkedin: meta.referralLinkedin || null,
+    referralDate: meta.referralDate || null,
+    referralNotes: meta.referralNotes || null
+  };
+  return cleanNotes
+    ? `${cleanNotes}\n\n${META_TAG_START}${JSON.stringify(metaPayload)}${META_TAG_END}`
+    : `${META_TAG_START}${JSON.stringify(metaPayload)}${META_TAG_END}`;
+};
+
+const parseNotesWithMeta = (notesText) => {
+  if (!notesText || typeof notesText !== 'string') {
+    return { cleanNotes: '', meta: {} };
+  }
+  const match = notesText.match(/<!-- CT_META:([\s\S]*?):CT_META -->/);
+  if (!match) {
+    return { cleanNotes: notesText, meta: {} };
+  }
+  try {
+    const meta = JSON.parse(match[1]);
+    const cleanNotes = notesText.replace(/<!-- CT_META:[\s\S]*?:CT_META -->/g, '').trim();
+    return { cleanNotes, meta };
+  } catch {
+    return { cleanNotes: notesText, meta: {} };
+  }
+};
 
 // Helpers to map between DB snake_case and UI camelCase
 const mapToDb = (app, userId) => ({
@@ -30,38 +68,58 @@ const mapToDb = (app, userId) => ({
   salary_min: Number(app.salaryMin) || 0,
   salary_max: Number(app.salaryMax) || 0,
   currency: app.currency || '$',
-  applied_date: app.appliedDate || new Date().toISOString().split('T')[0],
+  applied_date: app.appliedDate || (app.plannedApplyDate || new Date().toISOString().split('T')[0]),
   job_url: app.jobUrl || '',
   contact_name: app.contactName || '',
   contact_email: app.contactEmail || '',
   resume_version: app.resumeVersion || '',
   tags: app.tags || [],
-  notes: app.notes || '',
+  notes: serializeNotesWithMeta(app.notes, {
+    deadline: app.deadline,
+    plannedApplyDate: app.plannedApplyDate,
+    referralStatus: app.referralStatus,
+    referralContact: app.referralContact,
+    referralRole: app.referralRole,
+    referralLinkedin: app.referralLinkedin,
+    referralDate: app.referralDate,
+    referralNotes: app.referralNotes
+  }),
   timeline: app.timeline || [],
   interviews: app.interviews || []
 });
 
-const mapFromDb = (item) => ({
-  id: item.id,
-  company: item.company,
-  title: item.title,
-  location: item.location || '',
-  workType: item.work_type || 'Remote',
-  status: item.status || 'applied',
-  priority: item.priority || 'medium',
-  salaryMin: Number(item.salary_min) || 0,
-  salaryMax: Number(item.salary_max) || 0,
-  currency: item.currency || '$',
-  appliedDate: item.applied_date,
-  jobUrl: item.job_url || '',
-  contactName: item.contact_name || '',
-  contactEmail: item.contact_email || '',
-  resumeVersion: item.resume_version || '',
-  tags: Array.isArray(item.tags) ? item.tags : [],
-  notes: item.notes || '',
-  timeline: Array.isArray(item.timeline) ? item.timeline : [],
-  interviews: Array.isArray(item.interviews) ? item.interviews : []
-});
+const mapFromDb = (item) => {
+  const { cleanNotes, meta } = parseNotesWithMeta(item.notes);
+  return {
+    id: item.id,
+    company: item.company,
+    title: item.title,
+    location: item.location || '',
+    workType: item.work_type || 'Remote',
+    status: item.status || 'applied',
+    priority: item.priority || 'medium',
+    salaryMin: Number(item.salary_min) || 0,
+    salaryMax: Number(item.salary_max) || 0,
+    currency: item.currency || '$',
+    appliedDate: item.applied_date,
+    plannedApplyDate: item.planned_apply_date || meta.plannedApplyDate || '',
+    deadline: item.deadline || meta.deadline || '',
+    referralStatus: item.referral_status || meta.referralStatus || 'none',
+    referralContact: item.referral_contact || meta.referralContact || '',
+    referralRole: item.referral_role || meta.referralRole || '',
+    referralLinkedin: item.referral_linkedin || meta.referralLinkedin || '',
+    referralDate: item.referral_date || meta.referralDate || '',
+    referralNotes: meta.referralNotes || '',
+    jobUrl: item.job_url || '',
+    contactName: item.contact_name || '',
+    contactEmail: item.contact_email || '',
+    resumeVersion: item.resume_version || '',
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    notes: cleanNotes,
+    timeline: Array.isArray(item.timeline) ? item.timeline : [],
+    interviews: Array.isArray(item.interviews) ? item.interviews : []
+  };
+};
 
 export default function App() {
   // Load Applications from LocalStorage or Initial Mock Data
@@ -415,6 +473,13 @@ export default function App() {
 
       {/* Main KPI Stats Bar */}
       <StatsOverview applications={applications} />
+
+      {/* Smart Alert & Warning Indication for Applications Pending to Apply */}
+      <PendingAlertBanner
+        applications={applications}
+        onSelectApp={handleOpenEditModal}
+        onUpdateStatus={handleUpdateStatus}
+      />
 
       {/* Views Container */}
       <main className="animate-fade-in" style={{ flex: 1 }}>

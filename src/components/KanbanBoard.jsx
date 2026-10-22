@@ -17,6 +17,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { formatSalaryRange } from '../utils/currency';
 
 const ICON_MAP = {
   Bookmark,
@@ -48,7 +49,7 @@ const getDaysAgo = (dateStr) => {
   return Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
 };
 
-export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus, onDeleteApp, onOpenAddModalWithStage }) {
+export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus, onDeleteApp, onOpenAddModalWithStage, displayCurrency = 'INR' }) {
   const [draggedId, setDraggedId] = useState(null);
   const [dragOverStage, setDragOverStage] = useState(null);
 
@@ -224,12 +225,31 @@ export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus,
 
                       {/* Salary & Work Type */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '10px', fontSize: '0.75rem' }}>
-                        {app.salaryMax > 0 && (
-                          <span style={{ color: 'var(--status-offer)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <DollarSign size={12} />
-                            {(app.salaryMin / 1000).toFixed(0)}k - {(app.salaryMax / 1000).toFixed(0)}k
-                          </span>
-                        )}
+                        {app.salaryMax > 0 && (() => {
+                          const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency);
+                          return (
+                            <span
+                              style={{
+                                color: 'var(--status-offer)',
+                                fontWeight: 700,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                background: 'rgba(16, 185, 129, 0.08)',
+                                padding: '2px 7px',
+                                borderRadius: '6px'
+                              }}
+                              title={sal.isConverted ? `Original: ${sal.original} (Converted at current rates)` : `Stated salary range in ${sal.targetCurrency}`}
+                            >
+                              <span>{sal.formatted}</span>
+                              {sal.isConverted && (
+                                <span style={{ fontSize: '0.67rem', opacity: 0.75, fontWeight: 500 }}>
+                                  ({sal.original})
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })()}
                         <span style={{
                           background: 'var(--bg-glass)',
                           border: '1px solid var(--border-color)',

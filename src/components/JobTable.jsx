@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { STAGES, WORK_TYPES, PRIORITIES } from '../data/mockData';
+import { convertSalary, formatSalaryRange } from '../utils/currency';
 import {
   ArrowUpDown,
   Edit2,
@@ -30,7 +31,8 @@ export default function JobTable({
   onUpdateStatus,
   onDeleteApp,
   onBulkDelete,
-  onBulkStatusUpdate
+  onBulkStatusUpdate,
+  displayCurrency = 'INR'
 }) {
   const [sortField, setSortField] = useState('appliedDate');
   const [sortDirection, setSortDirection] = useState('desc');
@@ -57,8 +59,8 @@ export default function JobTable({
       let bVal = b[sortField] || '';
 
       if (sortField === 'salary') {
-        aVal = a.salaryMax || 0;
-        bVal = b.salaryMax || 0;
+        aVal = convertSalary(a.salaryMax, a.currency, displayCurrency) || 0;
+        bVal = convertSalary(b.salaryMax, b.currency, displayCurrency) || 0;
       }
 
       if (sortField === 'deadline') {
@@ -70,7 +72,7 @@ export default function JobTable({
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [applications, statusFilter, workTypeFilter, priorityFilter, sortField, sortDirection]);
+  }, [applications, statusFilter, workTypeFilter, priorityFilter, sortField, sortDirection, displayCurrency]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -225,7 +227,7 @@ export default function JobTable({
               </th>
               <th style={{ padding: '12px' }}>Work Type</th>
               <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('salary')}>
-                Salary <ArrowUpDown size={13} />
+                Salary ({displayCurrency === 'INR' ? '₹ INR' : '$ USD'}) <ArrowUpDown size={13} />
               </th>
               <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
             </tr>
@@ -350,7 +352,20 @@ export default function JobTable({
                       {app.workType} ({app.location || 'Remote'})
                     </td>
                     <td style={{ padding: '12px', fontWeight: 600, color: app.salaryMax ? 'var(--status-offer)' : 'var(--text-muted)' }}>
-                      {app.salaryMax ? `$${(app.salaryMin/1000).toFixed(0)}k - $${(app.salaryMax/1000).toFixed(0)}k` : 'N/A'}
+                      {(() => {
+                        if (!app.salaryMax) return 'N/A';
+                        const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency);
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <span>{sal.formatted}</span>
+                            {sal.isConverted && (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                                Orig: {sal.original}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td style={{ padding: '12px', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
                       {app.appliedDate || 'Not applied'}

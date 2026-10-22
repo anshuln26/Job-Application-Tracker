@@ -1,10 +1,12 @@
 import React from 'react';
 import { Send, Calendar, Trophy, Percent, DollarSign, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { convertSalary, formatSingleSalary } from '../utils/currency';
 
-export default function StatsOverview({ applications }) {
+export default function StatsOverview({ applications, displayCurrency = 'INR', onToggleCurrency }) {
   const total = applications.length;
-  const appliedCount = applications.filter(a => a.status !== 'wishlist').length;
+  const appliedCount = applications.filter(a => a.status !== 'wishlist' && a.status !== 'referral').length;
+  const pendingApplyCount = applications.filter(a => a.status === 'wishlist' || a.status === 'referral').length;
   const interviewingCount = applications.filter(a => a.status === 'interviewing').length;
   const offerCount = applications.filter(a => a.status === 'offer').length;
   
@@ -13,10 +15,16 @@ export default function StatsOverview({ applications }) {
     ? Math.round(((interviewingCount + offerCount) / appliedCount) * 100) 
     : 0;
 
-  // Average Salary Calculation
+  // Average Salary Calculation normalized into displayCurrency (INR or USD)
   const validSalaries = applications.filter(a => a.salaryMax > 0);
   const avgSalary = validSalaries.length > 0
-    ? Math.round(validSalaries.reduce((acc, a) => acc + (a.salaryMin + a.salaryMax) / 2, 0) / validSalaries.length)
+    ? Math.round(
+        validSalaries.reduce((acc, a) => {
+          const minConv = convertSalary(a.salaryMin, a.currency, displayCurrency);
+          const maxConv = convertSalary(a.salaryMax, a.currency, displayCurrency);
+          return acc + (minConv + maxConv) / 2;
+        }, 0) / validSalaries.length
+      )
     : 0;
 
   const triggerConfetti = () => {
@@ -46,7 +54,7 @@ export default function StatsOverview({ applications }) {
           </div>
         </div>
         <div style={{ marginTop: '12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-          {appliedCount} submitted · {applications.filter(a => a.status === 'wishlist').length} saved
+          {appliedCount} submitted · <span style={{ color: pendingApplyCount > 0 ? 'var(--status-interview)' : 'inherit', fontWeight: 600 }}>{pendingApplyCount} pending to apply</span>
         </div>
       </div>
 
@@ -117,17 +125,53 @@ export default function StatsOverview({ applications }) {
       <div className="glass-panel glass-panel-interactive" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Avg Salary Target</span>
-            <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px' }}>
-              ${avgSalary ? (avgSalary / 1000).toFixed(0) + 'k' : 'N/A'}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Avg Target Salary</span>
+              {onToggleCurrency && (
+                <button
+                  type="button"
+                  onClick={() => onToggleCurrency(displayCurrency === 'INR' ? 'USD' : 'INR')}
+                  title={`Switch to ${displayCurrency === 'INR' ? 'USD ($)' : 'INR (₹)'}`}
+                  style={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '6px',
+                    padding: '2px 7px',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    color: 'var(--accent-primary)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                  }}
+                >
+                  <span>{displayCurrency === 'INR' ? '🇮🇳 ₹ INR' : '🇺🇸 $ USD'}</span>
+                  <span style={{ opacity: 0.6 }}>⇄</span>
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', letterSpacing: '-0.02em' }}>
+              {avgSalary ? formatSingleSalary(avgSalary, displayCurrency) : 'N/A'}
             </div>
           </div>
-          <div style={{ background: 'rgba(99, 102, 241, 0.12)', padding: '10px', borderRadius: '12px', color: 'var(--accent-primary)' }}>
-            <DollarSign size={20} />
+          <div style={{
+            background: 'rgba(99, 102, 241, 0.12)',
+            padding: '10px',
+            borderRadius: '12px',
+            color: 'var(--accent-primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: '40px',
+            minHeight: '40px'
+          }}>
+            <span style={{ fontSize: '1.15rem', fontWeight: 800 }}>{displayCurrency === 'INR' ? '₹' : '$'}</span>
           </div>
         </div>
         <div style={{ marginTop: '12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-          Based on specified target ranges
+          {displayCurrency === 'INR' ? 'Normalized to INR (₹ / LPA)' : 'Normalized to USD ($ / yr)'} · Click badge to switch
         </div>
       </div>
     </div>

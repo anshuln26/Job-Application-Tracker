@@ -1,5 +1,14 @@
 import React, { useState } from 'react';
-import { Calendar, Clock, CheckCircle2, Circle, Plus, AlertTriangle, Users } from 'lucide-react';
+import { Calendar, Clock, CheckCircle2, Circle, Plus, AlertTriangle } from 'lucide-react';
+
+const calculateDiffDays = (targetDateStr) => {
+  if (!targetDateStr) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(targetDateStr);
+  d.setHours(0, 0, 0, 0);
+  return Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+};
 
 export default function CalendarView({ applications, onSelectApp, onToggleInterviewComplete, onAddInterview }) {
   const [selectedAppId, setSelectedAppId] = useState('');
@@ -11,45 +20,31 @@ export default function CalendarView({ applications, onSelectApp, onToggleInterv
   // Extract application deadlines
   const deadlineEvents = applications
     .filter(app => app.deadline)
-    .map(app => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const d = new Date(app.deadline);
-      d.setHours(0, 0, 0, 0);
-      const diffDays = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
-      return {
-        id: 'dl-' + app.id,
-        appId: app.id,
-        company: app.company,
-        jobTitle: app.title,
-        date: app.deadline,
-        diffDays,
-        status: app.status,
-        type: 'Application Deadline'
-      };
-    })
+    .map(app => ({
+      id: 'dl-' + app.id,
+      appId: app.id,
+      company: app.company,
+      jobTitle: app.title,
+      date: app.deadline,
+      diffDays: calculateDiffDays(app.deadline),
+      status: app.status,
+      type: 'Application Deadline'
+    }))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   // Extract planned apply dates for unapplied jobs
   const plannedEvents = applications
     .filter(app => app.plannedApplyDate && (app.status === 'wishlist' || app.status === 'referral'))
-    .map(app => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const d = new Date(app.plannedApplyDate);
-      d.setHours(0, 0, 0, 0);
-      const diffDays = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
-      return {
-        id: 'pl-' + app.id,
-        appId: app.id,
-        company: app.company,
-        jobTitle: app.title,
-        date: app.plannedApplyDate,
-        diffDays,
-        status: app.status,
-        type: 'Planned Apply Date'
-      };
-    })
+    .map(app => ({
+      id: 'pl-' + app.id,
+      appId: app.id,
+      company: app.company,
+      jobTitle: app.title,
+      date: app.plannedApplyDate,
+      diffDays: calculateDiffDays(app.plannedApplyDate),
+      status: app.status,
+      type: 'Planned Apply Date'
+    }))
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
   // Flatten all interviews from applications

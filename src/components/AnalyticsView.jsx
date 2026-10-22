@@ -5,16 +5,18 @@ import {
 } from 'recharts';
 import { STAGES } from '../data/mockData';
 import { Lightbulb, TrendingUp, DollarSign, Award, Compass } from 'lucide-react';
+import { convertSalary } from '../utils/currency';
 
 const STAGE_COLORS = {
   wishlist: '#8B5CF6',
+  referral: '#EC4899',
   applied: '#3B82F6',
   interviewing: '#F59E0B',
   offer: '#10B981',
   rejected: '#EF4444'
 };
 
-export default function AnalyticsView({ applications }) {
+export default function AnalyticsView({ applications, displayCurrency = 'INR' }) {
   // Data 1: Stage Breakdown
   const stageData = STAGES.map(s => {
     const count = applications.filter(a => a.status === s.id).length;
@@ -33,14 +35,21 @@ export default function AnalyticsView({ applications }) {
     value: workTypeCounts[key]
   }));
 
-  // Data 3: Top Salaries Comparison
+  // Data 3: Top Salaries Comparison normalized to displayCurrency (INR or USD)
+  const isINR = displayCurrency === 'INR';
   const salaryData = applications
     .filter(a => a.salaryMax > 0)
-    .map(a => ({
-      company: a.company.length > 10 ? a.company.substring(0, 10) + '...' : a.company,
-      Min: Math.round(a.salaryMin / 1000),
-      Max: Math.round(a.salaryMax / 1000)
-    }))
+    .map(a => {
+      const convMin = convertSalary(a.salaryMin, a.currency, displayCurrency);
+      const convMax = convertSalary(a.salaryMax, a.currency, displayCurrency);
+      return {
+        company: a.company.length > 10 ? a.company.substring(0, 10) + '...' : a.company,
+        fullName: a.company,
+        // If INR, plot in Lakhs (LPA, e.g. 28 LPA); If USD, plot in Thousands ($k, e.g. 165k)
+        Min: isINR ? Math.round((convMin / 100000) * 10) / 10 : Math.round(convMin / 1000),
+        Max: isINR ? Math.round((convMax / 100000) * 10) / 10 : Math.round(convMax / 1000)
+      };
+    })
     .slice(0, 8);
 
   // Data 4: Timeline
@@ -126,8 +135,14 @@ export default function AnalyticsView({ applications }) {
 
       {/* Middle Row: Salary Comparison Bar Chart */}
       <div className="glass-panel" style={{ padding: '20px' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <DollarSign size={18} style={{ color: 'var(--status-offer)' }} /> Expected Salary Ranges ($k/year)
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <DollarSign size={18} style={{ color: 'var(--status-offer)' }} />
+            Target Salary Ranges ({isINR ? '₹ in Lakhs / LPA' : '$ in Thousands / yr'})
+          </span>
+          <span className="badge" style={{ fontSize: '0.72rem', background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+            Normalized to {isINR ? '🇮🇳 ₹ INR' : '🇺🇸 $ USD'}
+          </span>
         </h3>
         <div style={{ height: '280px' }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -137,10 +152,11 @@ export default function AnalyticsView({ applications }) {
               <YAxis stroke="var(--text-secondary)" fontSize={12} />
               <Tooltip
                 contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+                formatter={(val) => [isINR ? `₹${val} Lakhs (LPA)` : `$${val}k / yr`, 'Salary']}
               />
               <Legend />
-              <Bar dataKey="Min" fill="#6366F1" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="Max" fill="#10B981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Min" name={`Min Target (${isINR ? '₹ LPA' : '$k'})`} fill="#6366F1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="Max" name={`Max Target (${isINR ? '₹ LPA' : '$k'})`} fill="#10B981" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
