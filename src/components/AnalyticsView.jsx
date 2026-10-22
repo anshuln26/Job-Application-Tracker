@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { STAGES } from '../data/mockData';
 import { Lightbulb, TrendingUp, DollarSign, Award, Compass } from 'lucide-react';
-import { convertSalary } from '../utils/currency';
+import { convertSalary, annualizeSalary } from '../utils/currency';
 
 const STAGE_COLORS = {
   wishlist: '#8B5CF6',
@@ -40,11 +40,15 @@ export default function AnalyticsView({ applications, displayCurrency = 'INR' })
   const salaryData = applications
     .filter(a => a.salaryMax > 0)
     .map(a => {
-      const convMin = convertSalary(a.salaryMin, a.currency, displayCurrency);
-      const convMax = convertSalary(a.salaryMax, a.currency, displayCurrency);
+      const period = a.salaryPeriod || ((a.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
+      const annMin = annualizeSalary(a.salaryMin, period, a.hoursPerWeek);
+      const annMax = annualizeSalary(a.salaryMax, period, a.hoursPerWeek);
+      const convMin = convertSalary(annMin, a.currency, displayCurrency);
+      const convMax = convertSalary(annMax, a.currency, displayCurrency);
+      const isIntern = period === 'monthly' || (a.title || '').toLowerCase().includes('intern');
       return {
-        company: a.company.length > 10 ? a.company.substring(0, 10) + '...' : a.company,
-        fullName: a.company,
+        company: (a.company.length > 8 ? a.company.substring(0, 8) + '..' : a.company) + (isIntern ? ' (Intern)' : ''),
+        fullName: a.company + (isIntern ? ' (Internship)' : ''),
         // If INR, plot in Lakhs (LPA, e.g. 28 LPA); If USD, plot in Thousands ($k, e.g. 165k)
         Min: isINR ? Math.round((convMin / 100000) * 10) / 10 : Math.round(convMin / 1000),
         Max: isINR ? Math.round((convMax / 100000) * 10) / 10 : Math.round(convMax / 1000)

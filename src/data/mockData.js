@@ -231,5 +231,30 @@ export const INITIAL_APPLICATIONS = [
       { id: 't3', stage: 'Status Update', date: '2026-09-02', notes: 'Role put on hold. Rejection received.' }
     ],
     interviews: []
+  },
+  {
+    id: 'job-9',
+    company: 'SugarLabs',
+    title: 'SDE Intern',
+    location: 'Remote',
+    workType: 'Remote',
+    status: 'wishlist',
+    priority: 'medium',
+    salaryMin: 60000,
+    salaryMax: 60000,
+    currency: 'INR',
+    salaryPeriod: 'monthly',
+    appliedDate: '',
+    plannedApplyDate: '2026-10-28',
+    deadline: '2026-11-12',
+    jobUrl: 'https://sugarlabs.org',
+    contactName: 'Community Mentors',
+    contactEmail: 'contact@sugarlabs.org',
+    referralStatus: 'none',
+    resumeVersion: 'Software_Engineer_2026.pdf',
+    tags: ['Open Source', 'Python', 'Internship'],
+    notes: 'Monthly stipend of ₹60,000 / mo for SDE intern. Open source contribution milestone.',
+    timeline: [],
+    interviews: []
   }
 ];

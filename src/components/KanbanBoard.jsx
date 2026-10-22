@@ -225,21 +225,23 @@ export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus,
                       {/* Salary & Work Type */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '10px', fontSize: '0.75rem' }}>
                         {app.salaryMax > 0 && (() => {
-                          const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency);
+                          const period = app.salaryPeriod || ((app.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
+                          const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency, period, app.hoursPerWeek || 40);
                           return (
                             <span
                               style={{
-                                color: 'var(--status-offer)',
+                                color: period === 'monthly' ? '#EC4899' : 'var(--status-offer)',
                                 fontWeight: 700,
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '3px',
-                                background: 'rgba(16, 185, 129, 0.08)',
+                                gap: '4px',
+                                background: period === 'monthly' ? 'rgba(236, 72, 153, 0.1)' : 'rgba(16, 185, 129, 0.08)',
                                 padding: '2px 7px',
                                 borderRadius: '6px'
                               }}
-                              title={sal.isConverted ? `Original: ${sal.original} (Converted at current rates)` : `Stated salary range in ${sal.targetCurrency}`}
+                              title={sal.isConverted ? `Original: ${sal.original} (Converted at current rates)` : `Stated in ${sal.targetCurrency}`}
                             >
+                              {period === 'monthly' && <span style={{ fontSize: '0.72rem' }}>🎓</span>}
                               <span>{sal.formatted}</span>
                               {sal.isConverted && (
                                 <span style={{ fontSize: '0.67rem', opacity: 0.75, fontWeight: 500 }}>

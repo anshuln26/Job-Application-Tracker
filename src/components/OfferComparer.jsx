@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Scale, Trophy, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { convertSalary, formatSalaryRange } from '../utils/currency';
+import { convertSalary, formatSalaryRange, annualizeSalary } from '../utils/currency';
 
 export default function OfferComparer({ applications, displayCurrency = 'INR' }) {
   const offerApps = applications.filter(a => a.status === 'offer' || a.status === 'interviewing');
@@ -24,8 +24,10 @@ export default function OfferComparer({ applications, displayCurrency = 'INR' })
   };
 
   const calculateTotalScore = (app) => {
-    // Normalize salary to USD equivalent for standard scoring (200k USD / ~1.7 Cr INR = 30 pts)
-    const normalizedUSD = convertSalary(app.salaryMax, app.currency, 'USD');
+    // Annualize if monthly/hourly before scoring
+    const period = app.salaryPeriod || ((app.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
+    const annMax = annualizeSalary(app.salaryMax, period, app.hoursPerWeek);
+    const normalizedUSD = convertSalary(annMax, app.currency, 'USD');
     const salaryScore = Math.min(30, (normalizedUSD / 200000) * 30);
     const flexScore = getRating(app.id, 'flexibility', 7) * 2; // Max 20 pts
     const cultureScore = getRating(app.id, 'culture', 8) * 2.5; // Max 25 pts
@@ -149,22 +151,21 @@ export default function OfferComparer({ applications, displayCurrency = 'INR' })
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Salary Range:</span>
                     <div style={{ textAlign: 'right' }}>
-                      <strong style={{ color: 'var(--status-offer)' }}>
-                        {(() => {
-                          const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency);
-                          return sal.formatted;
-                        })()}
-                      </strong>
                       {(() => {
-                        const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency);
-                        if (sal.isConverted) {
-                          return (
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                              Orig: {sal.original}
-                            </div>
-                          );
-                        }
-                        return null;
+                        const period = app.salaryPeriod || ((app.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
+                        const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency, period, app.hoursPerWeek || 40);
+                        return (
+                          <>
+                            <strong style={{ color: period === 'monthly' ? '#EC4899' : 'var(--status-offer)' }}>
+                              {sal.formatted}
+                            </strong>
+                            {sal.isConverted && (
+                              <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                Orig: {sal.original}
+                              </div>
+                            )}
+                          </>
+                        );
                       })()}
                     </div>
                   </div>

@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, Calendar, User, FileText, Briefcase, Users, Clock, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { STAGES, WORK_TYPES, PRIORITIES, REFERRAL_STATUSES } from '../data/mockData';
-import { SUPPORTED_CURRENCIES, formatSalaryRange } from '../utils/currency';
+import { SUPPORTED_CURRENCIES, SALARY_PERIODS, formatSalaryRange, annualizeSalary } from '../utils/currency';
 
 const createInitialFormData = (application, initialStage, displayCurrency = 'INR') => {
   if (application) {
+    const isIntern = (application.title || '').toLowerCase().includes('intern');
     return {
       ...application,
       currency: application.currency || displayCurrency || 'INR',
+      salaryPeriod: application.salaryPeriod || (isIntern ? 'monthly' : 'yearly'),
+      hoursPerWeek: application.hoursPerWeek || 40,
       plannedApplyDate: application.plannedApplyDate || '',
       deadline: application.deadline || '',
       referralStatus: application.referralStatus || 'none',
@@ -34,6 +37,8 @@ const createInitialFormData = (application, initialStage, displayCurrency = 'INR
     salaryMin: isINR ? 1800000 : 120000,
     salaryMax: isINR ? 2800000 : 150000,
     currency: displayCurrency || 'INR',
+    salaryPeriod: 'yearly',
+    hoursPerWeek: 40,
     appliedDate: initialStage === 'applied' ? today : '',
     plannedApplyDate: initialStage === 'wishlist' || initialStage === 'referral' ? today : '',
     deadline: '',
@@ -65,7 +70,17 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
   if (!isOpen) return null;
 
   const handleChange = (field, val) => {
-    setFormData(prev => ({ ...prev, [field]: val }));
+    setFormData(prev => {
+      const next = { ...prev, [field]: val };
+      if (field === 'title' && typeof val === 'string' && val.toLowerCase().includes('intern')) {
+        if (prev.salaryPeriod === 'yearly' && prev.salaryMin >= 500000) {
+          next.salaryPeriod = 'monthly';
+          next.salaryMin = (prev.currency || 'INR') === 'INR' ? 40000 : 2000;
+          next.salaryMax = (prev.currency || 'INR') === 'INR' ? 60000 : 3000;
+        }
+      }
+      return next;
+    });
   };
 
   const handleAddTag = (e) => {
@@ -296,71 +311,162 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                 </select>
               </div>
 
-              {/* Min Salary */}
+              {/* Pay Frequency / Period Selector */}
+              <div className="form-group">
+                <label className="form-label">Pay Frequency / Type</label>
+                <select
+                  className="form-input"
+                  value={formData.salaryPeriod || 'yearly'}
+                  onChange={(e) => {
+                    const newPeriod = e.target.value;
+                    const isINR = (formData.currency || 'INR') === 'INR';
+                    let newMin = formData.salaryMin;
+                    let newMax = formData.salaryMax;
+                    if (newPeriod === 'monthly' && formData.salaryPeriod === 'yearly') {
+                      newMin = isINR ? 40000 : 2500;
+                      newMax = isINR ? 60000 : 3500;
+                    } else if (newPeriod === 'hourly') {
+                      newMin = isINR ? 800 : 25;
+                      newMax = isINR ? 1500 : 45;
+                    } else if (newPeriod === 'yearly' && formData.salaryPeriod === 'monthly') {
+                      newMin = isINR ? 1800000 : 120000;
+                      newMax = isINR ? 2800000 : 150000;
+                    }
+                    setFormData(prev => ({
+                      ...prev,
+                      salaryPeriod: newPeriod,
+                      salaryMin: newMin,
+                      salaryMax: newMax
+                    }));
+                  }}
+                >
+                  {SALARY_PERIODS.map(p => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Expected Hours / Week if Hourly */}
+              {formData.salaryPeriod === 'hourly' && (
+                <div className="form-group">
+                  <label className="form-label">Expected Hours / Week</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="e.g. 40 (Full-time) or 20 (Part-time)"
+                    value={formData.hoursPerWeek || 40}
+                    onChange={(e) => handleChange('hoursPerWeek', Number(e.target.value))}
+                  />
+                </div>
+              )}
+
+              {/* Min Salary / Stipend */}
               <div className="form-group">
                 <label className="form-label">
-                  Min Salary {formData.currency === 'INR' ? '(₹ Raw / LPA)' : `(${formData.currency || '$'}/yr)`}
+                  {formData.salaryPeriod === 'monthly'
+                    ? `Min Stipend (${formData.currency === 'INR' ? '₹ / mo' : `${formData.currency || '$'}/mo`})`
+                    : formData.salaryPeriod === 'hourly'
+                    ? `Min Rate (${formData.currency === 'INR' ? '₹ / hr' : `${formData.currency || '$'}/hr`})`
+                    : `Min Salary (${formData.currency === 'INR' ? '₹ Raw / LPA' : `${formData.currency || '$'}/yr`})`}
                 </label>
                 <input
                   type="number"
                   className="form-input"
-                  placeholder={formData.currency === 'INR' ? 'e.g. 1800000 (18 LPA)' : 'e.g. 120000'}
+                  placeholder={
+                    formData.salaryPeriod === 'monthly'
+                      ? (formData.currency === 'INR' ? 'e.g. 40000' : 'e.g. 2000')
+                      : formData.salaryPeriod === 'hourly'
+                      ? (formData.currency === 'INR' ? 'e.g. 800' : 'e.g. 25')
+                      : (formData.currency === 'INR' ? 'e.g. 1800000 (18 LPA)' : 'e.g. 120000')
+                  }
                   value={formData.salaryMin}
                   onChange={(e) => handleChange('salaryMin', Number(e.target.value))}
                 />
               </div>
 
-              {/* Max Salary */}
+              {/* Max Salary / Stipend */}
               <div className="form-group">
                 <label className="form-label">
-                  Max Salary {formData.currency === 'INR' ? '(₹ Raw / LPA)' : `(${formData.currency || '$'}/yr)`}
+                  {formData.salaryPeriod === 'monthly'
+                    ? `Max Stipend (${formData.currency === 'INR' ? '₹ / mo' : `${formData.currency || '$'}/mo`})`
+                    : formData.salaryPeriod === 'hourly'
+                    ? `Max Rate (${formData.currency === 'INR' ? '₹ / hr' : `${formData.currency || '$'}/hr`})`
+                    : `Max Salary (${formData.currency === 'INR' ? '₹ Raw / LPA' : `${formData.currency || '$'}/yr`})`}
                 </label>
                 <input
                   type="number"
                   className="form-input"
-                  placeholder={formData.currency === 'INR' ? 'e.g. 2800000 (28 LPA)' : 'e.g. 150000'}
+                  placeholder={
+                    formData.salaryPeriod === 'monthly'
+                      ? (formData.currency === 'INR' ? 'e.g. 60000' : 'e.g. 3500')
+                      : formData.salaryPeriod === 'hourly'
+                      ? (formData.currency === 'INR' ? 'e.g. 1500' : 'e.g. 45')
+                      : (formData.currency === 'INR' ? 'e.g. 2800000 (28 LPA)' : 'e.g. 150000')
+                  }
                   value={formData.salaryMax}
                   onChange={(e) => handleChange('salaryMax', Number(e.target.value))}
                 />
               </div>
 
               {/* Live Conversion Preview Banner */}
-              {(formData.salaryMin > 0 || formData.salaryMax > 0) && (
-                <div style={{
-                  gridColumn: '1 / -1',
-                  background: 'var(--bg-glass)',
-                  border: '1px dashed var(--border-color)',
-                  padding: '10px 14px',
-                  borderRadius: '10px',
-                  fontSize: '0.78rem',
-                  color: 'var(--text-secondary)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: '8px'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>💱</span>
-                    <strong>
-                      {formData.currency === 'INR' ? 'USD Equivalent ($):' : 'INR Equivalent (₹):'}
-                    </strong>
-                    <span style={{ color: 'var(--status-offer)', fontWeight: 700 }}>
-                      {formatSalaryRange(
-                        formData.salaryMin,
-                        formData.salaryMax,
-                        formData.currency || 'INR',
-                        formData.currency === 'INR' ? 'USD' : 'INR'
-                      ).formatted}
-                    </span>
+              {(formData.salaryMin > 0 || formData.salaryMax > 0) && (() => {
+                const isINR = (formData.currency || 'INR') === 'INR';
+                const targetCurr = isINR ? 'USD' : 'INR';
+                const period = formData.salaryPeriod || 'yearly';
+                const convRange = formatSalaryRange(
+                  formData.salaryMin,
+                  formData.salaryMax,
+                  formData.currency || 'INR',
+                  targetCurr,
+                  period,
+                  formData.hoursPerWeek || 40
+                );
+
+                const annMin = annualizeSalary(formData.salaryMin, period, formData.hoursPerWeek || 40);
+                const annMax = annualizeSalary(formData.salaryMax, period, formData.hoursPerWeek || 40);
+                const annFormatted = formatSalaryRange(annMin, annMax, formData.currency || 'INR', formData.currency || 'INR', 'yearly').formatted;
+
+                return (
+                  <div style={{
+                    gridColumn: '1 / -1',
+                    background: 'var(--bg-glass)',
+                    border: '1px dashed var(--border-color)',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    fontSize: '0.78rem',
+                    color: 'var(--text-secondary)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '6px'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>💱</span>
+                        <strong>{isINR ? 'USD Equivalent ($):' : 'INR Equivalent (₹):'}</strong>
+                        <span style={{ color: 'var(--status-offer)', fontWeight: 700 }}>
+                          {convRange.formatted}
+                        </span>
+                      </div>
+                      <span style={{
+                        background: period === 'monthly' ? 'rgba(236, 72, 153, 0.12)' : period === 'hourly' ? 'rgba(59, 130, 246, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                        color: period === 'monthly' ? '#EC4899' : period === 'hourly' ? '#3B82F6' : '#10B981',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        fontWeight: 600,
+                        fontSize: '0.72rem'
+                      }}>
+                        {period === 'monthly' ? '🎓 Monthly Stipend' : period === 'hourly' ? `⏱️ Hourly (${formData.hoursPerWeek || 40}h/wk)` : '💼 Annual Full-Time CTC'}
+                      </span>
+                    </div>
+
+                    {period !== 'yearly' && (
+                      <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', borderTop: '1px solid var(--border-color)', paddingTop: '6px' }}>
+                        📅 <strong>Annualized Equivalent:</strong> {annFormatted} / yr {isINR ? `(≈ $${Math.round(annMax / 84.5 / 1000)}k/yr USD)` : `(≈ ₹${(annMax * 84.5 / 100000).toFixed(1)} LPA)`}
+                      </div>
+                    )}
                   </div>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>
-                    {formData.currency === 'INR'
-                      ? `(${formData.salaryMin >= 100000 ? (formData.salaryMin / 100000).toFixed(1) : 0} - ${formData.salaryMax >= 100000 ? (formData.salaryMax / 100000).toFixed(1) : 0} LPA)`
-                      : '(Rate: 1 USD ≈ ₹84.50 INR)'}
-                  </span>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Planned Apply Date */}
               <div className="form-group">

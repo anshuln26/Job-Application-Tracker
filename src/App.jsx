@@ -76,6 +76,8 @@ const mapToDb = (app, userId) => ({
   tags: app.tags || [],
   notes: serializeNotesWithMeta(app.notes, {
     currency: app.currency,
+    salaryPeriod: app.salaryPeriod,
+    hoursPerWeek: app.hoursPerWeek,
     deadline: app.deadline,
     plannedApplyDate: app.plannedApplyDate,
     referralStatus: app.referralStatus,
@@ -91,6 +93,7 @@ const mapToDb = (app, userId) => ({
 
 const mapFromDb = (item) => {
   const { cleanNotes, meta } = parseNotesWithMeta(item.notes);
+  const isIntern = (item.title || '').toLowerCase().includes('intern');
   return {
     id: item.id,
     company: item.company,
@@ -102,6 +105,8 @@ const mapFromDb = (item) => {
     salaryMin: Number(item.salary_min) || 0,
     salaryMax: Number(item.salary_max) || 0,
     currency: item.currency || meta.currency || 'INR',
+    salaryPeriod: item.salary_period || meta.salaryPeriod || (isIntern ? 'monthly' : 'yearly'),
+    hoursPerWeek: Number(item.hours_per_week || meta.hoursPerWeek) || 40,
     appliedDate: item.applied_date,
     plannedApplyDate: item.planned_apply_date || meta.plannedApplyDate || '',
     deadline: item.deadline || meta.deadline || '',

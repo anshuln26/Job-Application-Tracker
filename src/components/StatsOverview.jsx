@@ -1,9 +1,10 @@
-import React from 'react';
-import { Send, Calendar, Trophy, Percent, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
+import { Send, Calendar, Trophy, Percent, Sparkles, GraduationCap, Briefcase } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { convertSalary, formatSingleSalary } from '../utils/currency';
+import { convertSalary, formatSingleSalary, annualizeSalary, monthlyizeSalary } from '../utils/currency';
 
 export default function StatsOverview({ applications, displayCurrency = 'INR', onToggleCurrency }) {
+  const [payMetricMode, setPayMetricMode] = useState('auto');
   const total = applications.length;
   const appliedCount = applications.filter(a => a.status !== 'wishlist' && a.status !== 'referral').length;
   const pendingApplyCount = applications.filter(a => a.status === 'wishlist' || a.status === 'referral').length;
@@ -15,15 +16,42 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
     ? Math.round(((interviewingCount + offerCount) / appliedCount) * 100) 
     : 0;
 
-  // Average Salary Calculation normalized into displayCurrency (INR or USD)
+  // Separate full-time/yearly roles from intern/monthly roles
   const validSalaries = applications.filter(a => a.salaryMax > 0);
-  const avgSalary = validSalaries.length > 0
+  const internApps = validSalaries.filter(a => 
+    a.salaryPeriod === 'monthly' || (a.title && a.title.toLowerCase().includes('intern'))
+  );
+  const fulltimeApps = validSalaries.filter(a => 
+    a.salaryPeriod !== 'monthly' && (!a.title || !a.title.toLowerCase().includes('intern'))
+  );
+
+  const effectivePayMode = payMetricMode === 'auto'
+    ? (fulltimeApps.length === 0 && internApps.length > 0 ? 'intern' : 'annual')
+    : payMetricMode;
+
+  // Average Annual Salary (Full-time)
+  const avgAnnualSalary = fulltimeApps.length > 0
     ? Math.round(
-        validSalaries.reduce((acc, a) => {
-          const minConv = convertSalary(a.salaryMin, a.currency, displayCurrency);
-          const maxConv = convertSalary(a.salaryMax, a.currency, displayCurrency);
+        fulltimeApps.reduce((acc, a) => {
+          const annMin = annualizeSalary(a.salaryMin, a.salaryPeriod, a.hoursPerWeek);
+          const annMax = annualizeSalary(a.salaryMax, a.salaryPeriod, a.hoursPerWeek);
+          const minConv = convertSalary(annMin, a.currency, displayCurrency);
+          const maxConv = convertSalary(annMax, a.currency, displayCurrency);
           return acc + (minConv + maxConv) / 2;
-        }, 0) / validSalaries.length
+        }, 0) / fulltimeApps.length
+      )
+    : 0;
+
+  // Average Monthly Stipend (Intern)
+  const avgMonthlyStipend = internApps.length > 0
+    ? Math.round(
+        internApps.reduce((acc, a) => {
+          const mMin = monthlyizeSalary(a.salaryMin, a.salaryPeriod, a.hoursPerWeek);
+          const mMax = monthlyizeSalary(a.salaryMax, a.salaryPeriod, a.hoursPerWeek);
+          const minConv = convertSalary(mMin, a.currency, displayCurrency);
+          const maxConv = convertSalary(mMax, a.currency, displayCurrency);
+          return acc + (minConv + maxConv) / 2;
+        }, 0) / internApps.length
       )
     : 0;
 
@@ -121,57 +149,121 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
         </div>
       </div>
 
-      {/* Average Salary */}
+      {/* Average Salary & Intern Stipend Dual-View Card */}
       <div className="glass-panel glass-panel-interactive" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Avg Target Salary</span>
-              {onToggleCurrency && (
-                <button
-                  type="button"
-                  onClick={() => onToggleCurrency(displayCurrency === 'INR' ? 'USD' : 'INR')}
-                  title={`Switch to ${displayCurrency === 'INR' ? 'USD ($)' : 'INR (₹)'}`}
-                  style={{
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Header row with Title and Type / Currency Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {effectivePayMode === 'intern' ? '🎓 Avg Intern Stipend' : '💼 Avg Target Salary'}
+              </span>
+
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                {/* Full-time vs Intern Pill Switcher (Shown when both exist) */}
+                {fulltimeApps.length > 0 && internApps.length > 0 && (
+                  <div style={{
+                    display: 'inline-flex',
                     background: 'var(--bg-surface)',
                     border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    padding: '2px 7px',
-                    fontSize: '0.68rem',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    color: 'var(--accent-primary)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-                  }}
-                >
-                  <span>{displayCurrency === 'INR' ? '🇮🇳 ₹ INR' : '🇺🇸 $ USD'}</span>
-                  <span style={{ opacity: 0.6 }}>⇄</span>
-                </button>
-              )}
+                    borderRadius: '7px',
+                    padding: '2px',
+                    gap: '2px'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={() => setPayMetricMode('annual')}
+                      title="View Average Full-Time Annual Salary"
+                      style={{
+                        border: 'none',
+                        background: effectivePayMode === 'annual' ? 'var(--accent-primary)' : 'transparent',
+                        color: effectivePayMode === 'annual' ? '#fff' : 'var(--text-secondary)',
+                        borderRadius: '5px',
+                        padding: '2px 6px',
+                        fontSize: '0.66rem',
+                        fontWeight: effectivePayMode === 'annual' ? 700 : 500,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Annual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPayMetricMode('intern')}
+                      title="View Average Monthly Intern Stipend"
+                      style={{
+                        border: 'none',
+                        background: effectivePayMode === 'intern' ? 'var(--accent-primary)' : 'transparent',
+                        color: effectivePayMode === 'intern' ? '#fff' : 'var(--text-secondary)',
+                        borderRadius: '5px',
+                        padding: '2px 6px',
+                        fontSize: '0.66rem',
+                        fontWeight: effectivePayMode === 'intern' ? 700 : 500,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Intern
+                    </button>
+                  </div>
+                )}
+
+                {/* Inline Currency Switcher */}
+                {onToggleCurrency && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleCurrency(displayCurrency === 'INR' ? 'USD' : 'INR')}
+                    title={`Switch to ${displayCurrency === 'INR' ? 'USD ($)' : 'INR (₹)'}`}
+                    style={{
+                      background: 'var(--bg-surface)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '6px',
+                      padding: '2px 6px',
+                      fontSize: '0.66rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      color: 'var(--accent-primary)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}
+                  >
+                    <span>{displayCurrency === 'INR' ? '₹' : '$'}</span>
+                    <span style={{ opacity: 0.6 }}>⇄</span>
+                  </button>
+                )}
+              </div>
             </div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', letterSpacing: '-0.02em' }}>
-              {avgSalary ? formatSingleSalary(avgSalary, displayCurrency) : 'N/A'}
+
+            {/* Metric Value */}
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '4px', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+              {effectivePayMode === 'intern'
+                ? (avgMonthlyStipend ? formatSingleSalary(avgMonthlyStipend, displayCurrency, 'monthly') : 'N/A')
+                : (avgAnnualSalary ? formatSingleSalary(avgAnnualSalary, displayCurrency, 'yearly') : 'N/A')}
             </div>
           </div>
+
           <div style={{
-            background: 'rgba(99, 102, 241, 0.12)',
+            background: effectivePayMode === 'intern' ? 'rgba(236, 72, 153, 0.12)' : 'rgba(99, 102, 241, 0.12)',
             padding: '10px',
             borderRadius: '12px',
-            color: 'var(--accent-primary)',
+            color: effectivePayMode === 'intern' ? '#EC4899' : 'var(--accent-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             minWidth: '40px',
-            minHeight: '40px'
+            minHeight: '40px',
+            marginLeft: '12px'
           }}>
-            <span style={{ fontSize: '1.15rem', fontWeight: 800 }}>{displayCurrency === 'INR' ? '₹' : '$'}</span>
+            {effectivePayMode === 'intern' ? <GraduationCap size={20} /> : <Briefcase size={20} />}
           </div>
         </div>
+
+        {/* Footer Subtitle */}
         <div style={{ marginTop: '12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-          {displayCurrency === 'INR' ? 'Normalized to INR (₹ / LPA)' : 'Normalized to USD ($ / yr)'} · Click badge to switch
+          {effectivePayMode === 'intern'
+            ? `Based on ${internApps.length} monthly intern stipend target(s)`
+            : `Based on ${fulltimeApps.length} full-time annual target(s)`}
+          {fulltimeApps.length > 0 && internApps.length > 0 && ' · Click pill to switch'}
         </div>
       </div>
     </div>

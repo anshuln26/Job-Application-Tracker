@@ -1,5 +1,6 @@
 // Currency utilities and exchange rates for CareerTrack Pro
 // Specially optimized for Indian tech applicants applying domestically (INR) and globally (USD, EUR, GBP, AED, etc.)
+// Supports Yearly (Annual CTC), Monthly (Internship Stipend / Monthly Salary), and Hourly (Freelance/Contract)
 
 export const EXCHANGE_RATES_TO_USD = {
   USD: 1.0,
@@ -29,8 +30,14 @@ export const SUPPORTED_CURRENCIES = [
   { code: 'CNY', symbol: '¥', label: 'CNY (¥ - Chinese Yuan)', flag: '🇨🇳' }
 ];
 
+export const SALARY_PERIODS = [
+  { id: 'yearly', label: 'Yearly (Annual CTC)', unit: '/ yr', badge: 'Annual' },
+  { id: 'monthly', label: 'Monthly Stipend / Salary (Intern/Contract)', unit: '/ mo', badge: 'Monthly' },
+  { id: 'hourly', label: 'Hourly Rate (Contract/Remote)', unit: '/ hr', badge: 'Hourly' }
+];
+
 /**
- * Normalizes any legacy or freeform currency input (e.g. '$', '₹', 'INR', 'usd') into an official 3-letter code.
+ * Normalizes any legacy or freeform currency input into an official 3-letter code.
  */
 export const normalizeCurrencyCode = (raw) => {
   if (!raw) return 'INR';
@@ -63,22 +70,61 @@ export const convertSalary = (amount, fromCurr = 'USD', toCurr = 'INR') => {
   const fromRate = EXCHANGE_RATES_TO_USD[from] || 1;
   const toRate = EXCHANGE_RATES_TO_USD[to] || 1;
 
-  // Convert to USD first, then to target currency
   const inUSD = num / fromRate;
   const converted = inUSD * toRate;
   return Math.round(converted);
 };
 
 /**
- * Formats a single salary number nicely according to currency conventions.
- * In INR: formats as Lakhs (LPA) or Crores (Cr)
- * In USD: formats as $k or $M
+ * Annualizes any salary (monthly * 12, hourly * hoursPerWeek * 52)
  */
-export const formatSingleSalary = (amount, currency = 'INR', compact = true) => {
+export const annualizeSalary = (amount, period = 'yearly', hoursPerWeek = 40) => {
+  const num = Number(amount) || 0;
+  if (num <= 0) return 0;
+  if (period === 'monthly') return num * 12;
+  if (period === 'hourly') return num * (Number(hoursPerWeek) || 40) * 52;
+  return num;
+};
+
+/**
+ * Converts any salary to monthly equivalent (yearly / 12, hourly * hoursPerWeek * 4.333)
+ */
+export const monthlyizeSalary = (amount, period = 'yearly', hoursPerWeek = 40) => {
+  const num = Number(amount) || 0;
+  if (num <= 0) return 0;
+  if (period === 'monthly') return num;
+  if (period === 'hourly') return Math.round(num * (Number(hoursPerWeek) || 40) * 4.333);
+  return Math.round(num / 12);
+};
+
+/**
+ * Formats a single salary number nicely according to currency conventions and period.
+ */
+export const formatSingleSalary = (amount, currency = 'INR', period = 'yearly', compact = true) => {
   const num = Number(amount);
   if (!num || isNaN(num) || num <= 0) return 'N/A';
   const curr = normalizeCurrencyCode(currency);
+  const symbol = curr === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === curr)?.symbol || '₹');
 
+  if (period === 'monthly') {
+    if (curr === 'INR') {
+      if (num >= 100000) {
+        const l = num / 100000;
+        return `₹${l % 1 === 0 ? l.toFixed(0) : l.toFixed(1)}L / mo`;
+      }
+      return `₹${Math.round(num).toLocaleString('en-IN')} / mo`;
+    }
+    return `${symbol}${Math.round(num).toLocaleString()} / mo`;
+  }
+
+  if (period === 'hourly') {
+    if (curr === 'INR') {
+      return `₹${Math.round(num).toLocaleString('en-IN')} / hr`;
+    }
+    return `${symbol}${Math.round(num)} / hr`;
+  }
+
+  // Yearly (default)
   if (curr === 'INR') {
     if (num >= 10000000) {
       const cr = num / 10000000;
@@ -91,7 +137,6 @@ export const formatSingleSalary = (amount, currency = 'INR', compact = true) => 
     return `₹${num.toLocaleString('en-IN')}`;
   }
 
-  const symbol = curr === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === curr)?.symbol || '$');
   if (num >= 1000000) {
     return `${symbol}${(num / 1000000).toFixed(1)}M`;
   }
@@ -103,9 +148,9 @@ export const formatSingleSalary = (amount, currency = 'INR', compact = true) => 
 
 /**
  * Formats a salary range (min - max) converted to target display currency.
- * Also returns original format info for hover/subtext indications.
+ * Fully supports Yearly, Monthly (Stipend), and Hourly rates!
  */
-export const formatSalaryRange = (min, max, fromCurr = 'USD', targetCurr = 'INR') => {
+export const formatSalaryRange = (min, max, fromCurr = 'USD', targetCurr = 'INR', period = 'yearly', hoursPerWeek = 40) => {
   const minNum = Number(min) || 0;
   const maxNum = Number(max) || 0;
 
@@ -116,6 +161,7 @@ export const formatSalaryRange = (min, max, fromCurr = 'USD', targetCurr = 'INR'
       isConverted: false,
       fromCurrency: fromCurr,
       targetCurrency: targetCurr,
+      period: period || 'yearly',
       convertedMin: 0,
       convertedMax: 0
     };
@@ -128,33 +174,96 @@ export const formatSalaryRange = (min, max, fromCurr = 'USD', targetCurr = 'INR'
   const convMax = convertSalary(maxNum, from, target);
 
   let targetStr = '';
-  if (target === 'INR') {
-    if (convMax >= 10000000) {
-      const minCr = (convMin / 10000000).toFixed(1);
-      const maxCr = (convMax / 10000000).toFixed(1);
-      targetStr = `₹${minCr} - ₹${maxCr} Cr`;
-    } else if (convMax >= 100000) {
-      const minL = (convMin / 100000).toFixed(convMin % 100000 === 0 ? 0 : 1);
-      const maxL = (convMax / 100000).toFixed(convMax % 100000 === 0 ? 0 : 1);
-      targetStr = `₹${minL}L - ₹${maxL}L`;
+  let originalStr = '';
+  const isConverted = from !== target;
+  const targetSym = target === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === target)?.symbol || '₹');
+  const origSym = from === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === from)?.symbol || from);
+
+  if (period === 'monthly') {
+    // Monthly format (e.g., ₹60,000 / mo or $710 / mo)
+    if (target === 'INR') {
+      if (convMax >= 100000) {
+        const minL = (convMin / 100000).toFixed(convMin % 100000 === 0 ? 0 : 1);
+        const maxL = (convMax / 100000).toFixed(convMax % 100000 === 0 ? 0 : 1);
+        targetStr = convMin === convMax ? `₹${maxL}L / mo` : `₹${minL}L - ₹${maxL}L / mo`;
+      } else {
+        targetStr = convMin === convMax
+          ? `₹${convMax.toLocaleString('en-IN')} / mo`
+          : `₹${convMin.toLocaleString('en-IN')} - ₹${convMax.toLocaleString('en-IN')} / mo`;
+      }
     } else {
-      targetStr = `₹${convMin.toLocaleString('en-IN')} - ₹${convMax.toLocaleString('en-IN')}`;
+      targetStr = convMin === convMax
+        ? `${targetSym}${Math.round(convMax).toLocaleString()} / mo`
+        : `${targetSym}${Math.round(convMin).toLocaleString()} - ${targetSym}${Math.round(convMax).toLocaleString()} / mo`;
+    }
+
+    if (isConverted) {
+      if (from === 'INR') {
+        originalStr = minNum === maxNum
+          ? `₹${maxNum.toLocaleString('en-IN')} / mo`
+          : `₹${minNum.toLocaleString('en-IN')} - ₹${maxNum.toLocaleString('en-IN')} / mo`;
+      } else {
+        originalStr = minNum === maxNum
+          ? `${origSym}${Math.round(maxNum).toLocaleString()} / mo`
+          : `${origSym}${Math.round(minNum).toLocaleString()} - ${origSym}${Math.round(maxNum).toLocaleString()} / mo`;
+      }
+    }
+  } else if (period === 'hourly') {
+    // Hourly format
+    const hrsSuffix = hoursPerWeek ? ` (${hoursPerWeek}h/wk)` : '';
+    if (target === 'INR') {
+      targetStr = convMin === convMax
+        ? `₹${convMax.toLocaleString('en-IN')}/hr${hrsSuffix}`
+        : `₹${convMin.toLocaleString('en-IN')} - ₹${convMax.toLocaleString('en-IN')}/hr${hrsSuffix}`;
+    } else {
+      targetStr = convMin === convMax
+        ? `${targetSym}${Math.round(convMax)}/hr${hrsSuffix}`
+        : `${targetSym}${Math.round(convMin)} - ${targetSym}${Math.round(convMax)}/hr${hrsSuffix}`;
+    }
+
+    if (isConverted) {
+      if (from === 'INR') {
+        originalStr = minNum === maxNum
+          ? `₹${maxNum.toLocaleString('en-IN')}/hr`
+          : `₹${minNum.toLocaleString('en-IN')} - ₹${maxNum.toLocaleString('en-IN')}/hr`;
+      } else {
+        originalStr = minNum === maxNum
+          ? `${origSym}${Math.round(maxNum)}/hr`
+          : `${origSym}${Math.round(minNum)} - ${origSym}${Math.round(maxNum)}/hr`;
+      }
     }
   } else {
-    const sym = target === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === target)?.symbol || '$');
-    targetStr = `${sym}${Math.round(convMin / 1000)}k - ${sym}${Math.round(convMax / 1000)}k`;
-  }
-
-  const isConverted = from !== target;
-  let originalStr = '';
-  if (isConverted) {
-    if (from === 'INR') {
-      const origMinL = (minNum / 100000).toFixed(minNum % 100000 === 0 ? 0 : 1);
-      const origMaxL = (maxNum / 100000).toFixed(maxNum % 100000 === 0 ? 0 : 1);
-      originalStr = `₹${origMinL}L - ₹${origMaxL}L`;
+    // Yearly format (Annual CTC)
+    if (target === 'INR') {
+      if (convMax >= 10000000) {
+        const minCr = (convMin / 10000000).toFixed(1);
+        const maxCr = (convMax / 10000000).toFixed(1);
+        targetStr = convMin === convMax ? `₹${maxCr} Cr` : `₹${minCr} - ₹${maxCr} Cr`;
+      } else if (convMax >= 100000) {
+        const minL = (convMin / 100000).toFixed(convMin % 100000 === 0 ? 0 : 1);
+        const maxL = (convMax / 100000).toFixed(convMax % 100000 === 0 ? 0 : 1);
+        targetStr = convMin === convMax ? `₹${maxL}L` : `₹${minL}L - ₹${maxL}L`;
+      } else {
+        targetStr = convMin === convMax
+          ? `₹${convMax.toLocaleString('en-IN')}`
+          : `₹${convMin.toLocaleString('en-IN')} - ₹${convMax.toLocaleString('en-IN')}`;
+      }
     } else {
-      const origSym = from === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === from)?.symbol || from);
-      originalStr = `${origSym}${Math.round(minNum / 1000)}k - ${origSym}${Math.round(maxNum / 1000)}k`;
+      targetStr = convMin === convMax
+        ? `${targetSym}${Math.round(convMax / 1000)}k`
+        : `${targetSym}${Math.round(convMin / 1000)}k - ${targetSym}${Math.round(convMax / 1000)}k`;
+    }
+
+    if (isConverted) {
+      if (from === 'INR') {
+        const origMinL = (minNum / 100000).toFixed(minNum % 100000 === 0 ? 0 : 1);
+        const origMaxL = (maxNum / 100000).toFixed(maxNum % 100000 === 0 ? 0 : 1);
+        originalStr = minNum === maxNum ? `₹${origMaxL}L` : `₹${origMinL}L - ₹${origMaxL}L`;
+      } else {
+        originalStr = minNum === maxNum
+          ? `${origSym}${Math.round(maxNum / 1000)}k`
+          : `${origSym}${Math.round(minNum / 1000)}k - ${origSym}${Math.round(maxNum / 1000)}k`;
+      }
     }
   }
 
@@ -164,6 +273,7 @@ export const formatSalaryRange = (min, max, fromCurr = 'USD', targetCurr = 'INR'
     isConverted,
     fromCurrency: from,
     targetCurrency: target,
+    period: period || 'yearly',
     convertedMin: convMin,
     convertedMax: convMax
   };

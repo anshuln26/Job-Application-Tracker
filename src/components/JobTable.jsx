@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { STAGES, WORK_TYPES, PRIORITIES } from '../data/mockData';
-import { convertSalary, formatSalaryRange } from '../utils/currency';
+import { convertSalary, formatSalaryRange, annualizeSalary } from '../utils/currency';
 import {
   ArrowUpDown,
   Edit2,
@@ -59,8 +59,10 @@ export default function JobTable({
       let bVal = b[sortField] || '';
 
       if (sortField === 'salary') {
-        aVal = convertSalary(a.salaryMax, a.currency, displayCurrency) || 0;
-        bVal = convertSalary(b.salaryMax, b.currency, displayCurrency) || 0;
+        const aPeriod = a.salaryPeriod || ((a.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
+        const bPeriod = b.salaryPeriod || ((b.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
+        aVal = annualizeSalary(convertSalary(a.salaryMax, a.currency, displayCurrency), aPeriod, a.hoursPerWeek) || 0;
+        bVal = annualizeSalary(convertSalary(b.salaryMax, b.currency, displayCurrency), bPeriod, b.hoursPerWeek) || 0;
       }
 
       if (sortField === 'deadline') {
@@ -354,10 +356,14 @@ export default function JobTable({
                     <td style={{ padding: '12px', fontWeight: 600, color: app.salaryMax ? 'var(--status-offer)' : 'var(--text-muted)' }}>
                       {(() => {
                         if (!app.salaryMax) return 'N/A';
-                        const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency);
+                        const period = app.salaryPeriod || ((app.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
+                        const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency, period, app.hoursPerWeek || 40);
                         return (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <span>{sal.formatted}</span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                              {period === 'monthly' && <span style={{ fontSize: '0.72rem' }}>🎓</span>}
+                              <span>{sal.formatted}</span>
+                            </span>
                             {sal.isConverted && (
                               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>
                                 Orig: {sal.original}
