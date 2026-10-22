@@ -14,11 +14,14 @@ A modern, cloud-synced web application built to streamline and organize the soft
 
 ## ✨ Features
 
-- 📋 **Interactive Kanban Pipeline**: Track applications across stages (*Wishlist*, *Applied*, *Interviewing*, *Offer Received*, *Archived/Rejected*) with intuitive status controls and quick actions.
+- 📋 **Interactive Kanban Pipeline**: Track applications across 6 stages (*Wishlist*, *Waiting for Referral*, *Applied*, *Interviewing*, *Offer Received*, *Rejected*) with drag-and-drop and intuitive status controls.
+- 🤝 **LinkedIn Referral & Networking Tracker**: Track pending LinkedIn connection requests, referrer employee profiles, request dates, and follow-up status before applying.
+- ⏰ **Deadlines & Target Apply Dates**: Set and monitor application deadlines and planned apply dates with automatic countdowns (`🚨 Deadline Today`, `⚠️ 3 days left`, `Expired`).
+- 🚨 **Smart Action Center & Urgency Warning Banner**: Prominent dashboard alert banner highlighting pending applications, approaching deadlines, and awaiting referrals so you never miss an opening.
 - 📊 **Visual Analytics Dashboard**: Interactive charts powered by Recharts showing application status distributions, response rates, interview conversion ratios, and target salary spreads.
-- 📅 **Interview Calendar & Deadlines**: Keep track of upcoming phone screens, technical rounds, behavioral interviews, and follow-up deadlines in an organized timeline view.
+- 📅 **Unified Calendar & Schedule Tracker**: Track both upcoming interview rounds and application deadlines side-by-side in a centralized timeline.
 - ⚖️ **Offer Comparison Tool**: Compare job offers side-by-side with compensation breakdowns (base salary, bonus, equity), benefits, remote flexibility, and ratings to make informed career decisions.
-- 🔍 **Real-time Search & Filtering**: Instantly search by company, role, location, tags, notes, or priority.
+- 🔍 **Real-time Search & Multi-criteria Filtering**: Instantly search by company, role, location, tags, notes, priority, or filter by "Pending to Apply" and "With Deadlines".
 - ☁️ **Dual-Mode Architecture (Cloud + Offline)**:
   - **Cloud Mode**: Real-time cloud sync with Supabase PostgreSQL and email/password authentication.
   - **Local Mode**: Works 100% offline using browser `localStorage` when disconnected.
