@@ -85,12 +85,12 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
       style={{
         marginBottom: '24px',
         padding: '16px 20px',
-        border: isUrgent ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(245, 158, 11, 0.3)',
+        border: isUrgent ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(245, 158, 11, 0.35)',
         background: isUrgent
-          ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(17, 24, 39, 0.85))'
-          : 'linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(17, 24, 39, 0.85))',
+          ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), var(--bg-card))'
+          : 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), var(--bg-card))',
         borderRadius: 'var(--radius-lg)',
-        boxShadow: isUrgent ? '0 4px 20px rgba(239, 68, 68, 0.18)' : '0 4px 16px rgba(245, 158, 11, 0.12)',
+        boxShadow: isUrgent ? '0 4px 20px rgba(239, 68, 68, 0.12)' : '0 4px 16px rgba(245, 158, 11, 0.08)',
       }}
     >
       {/* Header bar */}
@@ -106,7 +106,7 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
               alignItems: 'center',
               justifyContent: 'center',
               color: '#fff',
-              boxShadow: isUrgent ? '0 0 14px rgba(239, 68, 68, 0.4)' : '0 0 12px rgba(245, 158, 11, 0.3)',
+              boxShadow: isUrgent ? '0 0 14px rgba(239, 68, 68, 0.35)' : '0 0 12px rgba(245, 158, 11, 0.25)',
               animation: isUrgent ? 'pulse 1.8s infinite' : 'none',
               flexShrink: 0
             }}
@@ -121,13 +121,13 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
               </h3>
               <span
                 style={{
-                  background: isUrgent ? 'rgba(239, 68, 68, 0.25)' : 'rgba(245, 158, 11, 0.25)',
-                  color: isUrgent ? '#FCA5A5' : '#FDE68A',
+                  background: isUrgent ? 'var(--status-rejected-bg)' : 'var(--status-interview-bg)',
+                  color: isUrgent ? 'var(--status-rejected)' : 'var(--status-interview)',
                   fontSize: '0.725rem',
                   fontWeight: 700,
                   padding: '2px 8px',
                   borderRadius: '12px',
-                  border: isUrgent ? '1px solid rgba(239, 68, 68, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)'
+                  border: isUrgent ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)'
                 }}
               >
                 {pendingJobs.length} {pendingJobs.length === 1 ? 'Job Pending' : 'Jobs Pending'}
@@ -136,21 +136,21 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
 
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '4px 0 0 0', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               {criticalCount > 0 && (
-                <span style={{ color: '#EF4444', fontWeight: 600 }}>
+                <span style={{ color: 'var(--status-rejected)', fontWeight: 700 }}>
                   🚨 {criticalCount} deadline closing today or expired
                 </span>
               )}
               {highCount > 0 && (
-                <span style={{ color: '#F59E0B', fontWeight: 600 }}>
+                <span style={{ color: 'var(--status-interview)', fontWeight: 700 }}>
                   ⏰ {highCount} deadline within 3 days
                 </span>
               )}
               {referralCount > 0 && (
-                <span style={{ color: '#F472B6', fontWeight: 600 }}>
+                <span style={{ color: 'var(--status-referral)', fontWeight: 700 }}>
                   🤝 {referralCount} waiting for LinkedIn connection / referral
                 </span>
               )}
-              <span>Review and submit your applications before opportunities close!</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Review and submit your applications before opportunities close!</span>
             </p>
           </div>
         </div>
@@ -226,8 +226,9 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
                       padding: '2px 8px',
                       borderRadius: '8px',
                       fontWeight: 700,
-                      background: job.status === 'referral' ? 'rgba(236, 72, 153, 0.15)' : 'rgba(139, 92, 246, 0.15)',
-                      color: job.status === 'referral' ? '#F472B6' : '#A78BFA'
+                      background: job.status === 'referral' ? 'var(--status-referral-bg)' : 'var(--status-wishlist-bg)',
+                      color: job.status === 'referral' ? 'var(--status-referral)' : 'var(--status-wishlist)',
+                      border: job.status === 'referral' ? '1px solid rgba(236, 72, 153, 0.25)' : '1px solid rgba(139, 92, 246, 0.25)'
                     }}
                   >
                     {job.status === 'referral' ? '🤝 Waiting for Referral' : '📌 In Wishlist'}
@@ -239,11 +240,16 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
                   <div
                     style={{
                       background: isCritical
-                        ? 'rgba(239, 68, 68, 0.18)'
+                        ? 'var(--status-rejected-bg)'
                         : isHigh
-                        ? 'rgba(245, 158, 11, 0.16)'
-                        : 'var(--bg-glass)',
-                      color: isCritical ? '#EF4444' : isHigh ? '#F59E0B' : 'var(--text-secondary)',
+                        ? 'var(--status-interview-bg)'
+                        : 'var(--bg-surface-hover)',
+                      color: isCritical ? 'var(--status-rejected)' : isHigh ? 'var(--status-interview)' : 'var(--text-secondary)',
+                      border: isCritical
+                        ? '1px solid rgba(239, 68, 68, 0.3)'
+                        : isHigh
+                        ? '1px solid rgba(245, 158, 11, 0.3)'
+                        : '1px solid var(--border-color)',
                       padding: '4px 8px',
                       borderRadius: '6px',
                       fontSize: '0.75rem',
@@ -265,8 +271,9 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
                 ) : job.plannedApplyDate ? (
                   <div
                     style={{
-                      background: 'rgba(139, 92, 246, 0.12)',
-                      color: '#A78BFA',
+                      background: 'var(--status-wishlist-bg)',
+                      border: '1px solid rgba(139, 92, 246, 0.25)',
+                      color: 'var(--status-wishlist)',
                       padding: '4px 8px',
                       borderRadius: '6px',
                       fontSize: '0.75rem',
@@ -285,12 +292,12 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
                 {(job.status === 'referral' || job.referralStatus === 'connection_pending') && (
                   <div
                     style={{
-                      background: 'rgba(236, 72, 153, 0.08)',
-                      border: '1px solid rgba(236, 72, 153, 0.2)',
+                      background: 'var(--status-referral-bg)',
+                      border: '1px solid rgba(236, 72, 153, 0.25)',
                       padding: '4px 8px',
                       borderRadius: '6px',
                       fontSize: '0.75rem',
-                      color: '#F472B6',
+                      color: 'var(--status-referral)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
@@ -312,7 +319,7 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        style={{ color: '#F472B6', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                        style={{ color: 'var(--status-referral)', display: 'flex', alignItems: 'center', flexShrink: 0 }}
                         title="Open LinkedIn Profile"
                       >
                         <ExternalLink size={12} />

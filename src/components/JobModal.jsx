@@ -201,7 +201,7 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
           display: 'flex',
           borderBottom: '1px solid var(--border-color)',
           padding: '0 24px',
-          background: 'var(--bg-glass)',
+          background: 'var(--bg-surface-hover)',
           gap: '16px'
         }}>
           {[
@@ -349,7 +349,7 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                           fontSize: '0.72rem',
                           padding: '2px 8px',
                           borderRadius: '12px',
-                          background: isSelected ? 'var(--accent-primary)' : 'var(--bg-glass)',
+                          background: isSelected ? 'var(--accent-primary)' : 'var(--bg-surface-hover)',
                           color: isSelected ? '#fff' : 'var(--text-secondary)',
                           border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
                           cursor: 'pointer',
@@ -497,7 +497,7 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                 return (
                   <div style={{
                     gridColumn: '1 / -1',
-                    background: 'var(--bg-glass)',
+                    background: 'var(--bg-surface-hover)',
                     border: '1px dashed var(--border-color)',
                     padding: '12px 16px',
                     borderRadius: '10px',
@@ -553,7 +553,7 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    background: 'var(--bg-glass)',
+                    background: 'var(--bg-surface-hover)',
                     border: 'none',
                     cursor: 'pointer',
                     color: 'var(--text-primary)',
@@ -861,7 +861,7 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
               </div>
 
               {/* 3. Notice Period & Availability */}
-              <div style={{ background: 'var(--bg-glass)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px' }}>
+              <div style={{ background: 'var(--bg-surface-hover)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '16px' }}>
                 <label className="form-label" style={{ fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>⏳</span>
                   <span>Notice Period & Availability for this Application</span>
@@ -1055,7 +1055,7 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
               </div>
 
               {formData.timeline.map((item, idx) => (
-                <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 1fr 32px', gap: '8px', alignItems: 'center', background: 'var(--bg-glass)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                <div key={item.id} style={{ display: 'grid', gridTemplateColumns: '1fr 140px 1fr 32px', gap: '8px', alignItems: 'center', background: 'var(--bg-surface-hover)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
                   <input
                     type="text"
                     className="form-input"

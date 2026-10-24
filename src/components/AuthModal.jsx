@@ -114,7 +114,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, showToast })
         {!configured ? (
           <div>
             <div style={{
-              background: 'var(--bg-glass)',
+              background: 'var(--bg-surface-hover)',
               border: '1px solid var(--border-color)',
               borderRadius: 'var(--radius-md)',
               padding: '16px',
@@ -130,6 +130,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess, showToast })
               </p>
               <pre style={{
                 background: 'var(--bg-main)',
+                border: '1px solid var(--border-color)',
                 padding: '12px',
                 borderRadius: '8px',
                 fontSize: '0.78rem',

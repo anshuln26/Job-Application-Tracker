@@ -89,7 +89,7 @@ export default function Navbar({
         </div>
 
         {/* View Switcher Tabs */}
-        <div style={{ display: 'flex', background: 'var(--bg-surface)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border-color)', gap: '4px' }}>
+        <div style={{ display: 'flex', background: 'var(--bg-surface-hover)', padding: '4px', borderRadius: '12px', border: '1px solid var(--border-color)', gap: '4px' }}>
           <button
             className={`btn ${activeView === 'kanban' ? 'btn-primary' : 'btn-ghost'}`}
             style={{ padding: '8px 14px', fontSize: '0.825rem' }}
@@ -136,7 +136,7 @@ export default function Navbar({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                background: 'var(--bg-surface)',
+                background: 'var(--bg-surface-hover)',
                 border: '1px solid var(--border-color)',
                 borderRadius: '10px',
                 padding: '3px',

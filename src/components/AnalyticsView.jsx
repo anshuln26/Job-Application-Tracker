@@ -100,9 +100,16 @@ export default function AnalyticsView({ applications, displayCurrency = 'INR' })
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+                  contentStyle={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    color: 'var(--text-primary)',
+                    boxShadow: 'var(--shadow-md)'
+                  }}
+                  itemStyle={{ color: 'var(--text-primary)' }}
                 />
-                <Legend />
+                <Legend wrapperStyle={{ color: 'var(--text-secondary)' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -129,7 +136,14 @@ export default function AnalyticsView({ applications, displayCurrency = 'INR' })
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+                  contentStyle={{
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '8px',
+                    color: 'var(--text-primary)',
+                    boxShadow: 'var(--shadow-md)'
+                  }}
+                  itemStyle={{ color: 'var(--text-primary)' }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -145,7 +159,7 @@ export default function AnalyticsView({ applications, displayCurrency = 'INR' })
             <DollarSign size={18} style={{ color: 'var(--status-offer)' }} />
             Target Salary Ranges ({isINR ? '₹ in Lakhs / LPA' : '$ in Thousands / yr'})
           </span>
-          <span className="badge" style={{ fontSize: '0.72rem', background: 'var(--bg-glass)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
+          <span className="badge" style={{ fontSize: '0.72rem', background: 'var(--bg-surface-hover)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
             Normalized to {isINR ? '🇮🇳 ₹ INR' : '🇺🇸 $ USD'}
           </span>
         </h3>
@@ -156,10 +170,18 @@ export default function AnalyticsView({ applications, displayCurrency = 'INR' })
               <XAxis dataKey="company" stroke="var(--text-secondary)" fontSize={12} />
               <YAxis stroke="var(--text-secondary)" fontSize={12} />
               <Tooltip
-                contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+                contentStyle={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  color: 'var(--text-primary)',
+                  boxShadow: 'var(--shadow-md)'
+                }}
+                itemStyle={{ color: 'var(--text-primary)' }}
+                labelStyle={{ color: 'var(--text-primary)', fontWeight: 700 }}
                 formatter={(val) => [isINR ? `₹${val} Lakhs (LPA)` : `$${val}k / yr`, 'Salary']}
               />
-              <Legend />
+              <Legend wrapperStyle={{ color: 'var(--text-secondary)' }} />
               <Bar dataKey="Min" name={`Min Target (${isINR ? '₹ LPA' : '$k'})`} fill="#6366F1" radius={[4, 4, 0, 0]} />
               <Bar dataKey="Max" name={`Max Target (${isINR ? '₹ LPA' : '$k'})`} fill="#10B981" radius={[4, 4, 0, 0]} />
             </BarChart>
@@ -185,7 +207,15 @@ export default function AnalyticsView({ applications, displayCurrency = 'INR' })
               <XAxis dataKey="month" stroke="var(--text-secondary)" fontSize={12} />
               <YAxis allowDecimals={false} stroke="var(--text-secondary)" fontSize={12} />
               <Tooltip
-                contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '8px' }}
+                contentStyle={{
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  color: 'var(--text-primary)',
+                  boxShadow: 'var(--shadow-md)'
+                }}
+                itemStyle={{ color: 'var(--text-primary)' }}
+                labelStyle={{ color: 'var(--text-primary)', fontWeight: 700 }}
               />
               <Area type="monotone" dataKey="Applications" stroke="#6366F1" strokeWidth={2} fillOpacity={1} fill="url(#appGradient)" />
             </AreaChart>
@@ -194,20 +224,20 @@ export default function AnalyticsView({ applications, displayCurrency = 'INR' })
       </div>
 
       {/* Strategic Insights Panel */}
-      <div className="glass-panel" style={{ padding: '20px', background: 'linear-gradient(135deg, var(--bg-surface), var(--bg-card))' }}>
+      <div className="glass-panel" style={{ padding: '20px' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Lightbulb size={18} style={{ color: 'var(--status-interview)' }} /> Career Search Insights & Tips
         </h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '14px', fontSize: '0.85rem' }}>
-          <div style={{ background: 'var(--bg-glass)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+          <div style={{ background: 'var(--bg-surface)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
             <strong style={{ color: 'var(--status-offer)', display: 'block', marginBottom: '4px' }}>🎯 Target High-Conversion Roles</strong>
             Applications submitted with warm referrals have 4x higher interview rates compared to cold portal submissions.
           </div>
-          <div style={{ background: 'var(--bg-glass)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+          <div style={{ background: 'var(--bg-surface)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
             <strong style={{ color: 'var(--accent-primary)', display: 'block', marginBottom: '4px' }}>⏱️ Follow Up Within 5-7 Days</strong>
             If an application remains in "Applied" status after 1 week, reach out to talent recruiters on LinkedIn.
           </div>
-          <div style={{ background: 'var(--bg-glass)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+          <div style={{ background: 'var(--bg-surface)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
             <strong style={{ color: 'var(--status-interview)', display: 'block', marginBottom: '4px' }}>💡 Negotiate Leverage</strong>
             Having 2+ active interview loops at once significantly increases your final compensation offer leverage.
           </div>

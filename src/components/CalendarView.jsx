@@ -215,8 +215,9 @@ export default function CalendarView({ applications, onSelectApp, onToggleInterv
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <Clock size={12} /> Deadline: {item.date}
                         <span className="badge" style={{
-                          background: isToday || isOverdue ? 'rgba(239, 68, 68, 0.2)' : isUrgent ? 'rgba(245, 158, 11, 0.2)' : 'var(--bg-glass)',
-                          color: isToday || isOverdue ? '#EF4444' : isUrgent ? '#F59E0B' : 'var(--text-secondary)'
+                          background: isToday || isOverdue ? 'var(--status-rejected-bg)' : isUrgent ? 'var(--status-interview-bg)' : 'var(--bg-surface-hover)',
+                          color: isToday || isOverdue ? 'var(--status-rejected)' : isUrgent ? 'var(--status-interview)' : 'var(--text-secondary)',
+                          border: isToday || isOverdue ? '1px solid rgba(239, 68, 68, 0.25)' : isUrgent ? '1px solid rgba(245, 158, 11, 0.25)' : '1px solid var(--border-color)'
                         }}>
                           {isOverdue ? `Closed (${Math.abs(item.diffDays)}d ago)` : isToday ? '🚨 DUE TODAY' : `${item.diffDays}d left`}
                         </span>
@@ -352,14 +353,14 @@ export default function CalendarView({ applications, onSelectApp, onToggleInterv
                 <div
                   key={item.id}
                   style={{
-                    background: 'var(--bg-glass)',
+                    background: 'var(--bg-surface)',
                     border: '1px solid var(--border-color)',
                     borderRadius: 'var(--radius-md)',
                     padding: '12px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    opacity: 0.8
+                    boxShadow: 'var(--shadow-sm)'
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

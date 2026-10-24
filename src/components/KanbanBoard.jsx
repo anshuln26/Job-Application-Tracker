@@ -102,7 +102,7 @@ export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus,
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, stage.id)}
             style={{
-              background: isHovered ? 'var(--bg-surface-hover)' : 'var(--bg-card)',
+              background: isHovered ? 'var(--bg-surface-hover)' : 'var(--bg-column)',
               border: isHovered ? `2px dashed ${stage.color}` : '1px solid var(--border-color)',
               borderRadius: 'var(--radius-lg)',
               padding: '14px',
@@ -176,7 +176,9 @@ export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus,
                         padding: '14px',
                         cursor: 'grab',
                         position: 'relative',
-                        borderColor: app.status === 'offer' ? 'rgba(16, 185, 129, 0.4)' : ''
+                        background: 'var(--bg-surface)',
+                        boxShadow: 'var(--shadow-sm)',
+                        borderColor: app.status === 'offer' ? 'rgba(16, 185, 129, 0.4)' : 'var(--border-color)'
                       }}
                     >
                       {/* Company Header */}

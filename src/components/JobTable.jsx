@@ -212,40 +212,40 @@ export default function JobTable({
       </div>
 
       {/* Table */}
-      <div style={{ overflowX: 'auto' }}>
+      <div style={{ overflowX: 'auto', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-              <th style={{ padding: '12px 8px', width: '40px' }}>
+            <tr className="job-table-header" style={{ color: 'var(--text-secondary)' }}>
+              <th style={{ padding: '12px 10px', width: '40px' }}>
                 <button
                   onClick={toggleSelectAll}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}
                 >
                   {selectedIds.length === filteredApps.length && filteredApps.length > 0
                     ? <CheckSquare size={18} style={{ color: 'var(--accent-primary)' }} />
                     : <Square size={18} />}
                 </button>
               </th>
-              <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('company')}>
+              <th style={{ padding: '12px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('company')}>
                 Company & Title <ArrowUpDown size={13} />
               </th>
-              <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('status')}>
+              <th style={{ padding: '12px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('status')}>
                 Status <ArrowUpDown size={13} />
               </th>
-              <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('priority')}>
+              <th style={{ padding: '12px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('priority')}>
                 Priority <ArrowUpDown size={13} />
               </th>
-              <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('deadline')}>
+              <th style={{ padding: '12px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('deadline')}>
                 Deadline <ArrowUpDown size={13} />
               </th>
-              <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('appliedDate')}>
+              <th style={{ padding: '12px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('appliedDate')}>
                 Dates <ArrowUpDown size={13} />
               </th>
-              <th style={{ padding: '12px' }}>Work Type</th>
-              <th style={{ padding: '12px', cursor: 'pointer' }} onClick={() => handleSort('salary')}>
+              <th style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>Work Type</th>
+              <th style={{ padding: '12px 14px', cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => handleSort('salary')}>
                 Salary ({displayCurrency === 'INR' ? '₹ INR' : '$ USD'}) <ArrowUpDown size={13} />
               </th>
-              <th style={{ padding: '12px', textAlign: 'right' }}>Actions</th>
+              <th style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -263,25 +263,26 @@ export default function JobTable({
                   <tr
                     key={app.id}
                     onClick={() => onSelectApp(app)}
+                    className="job-table-row"
                     style={{
                       borderBottom: '1px solid var(--border-color)',
                       cursor: 'pointer',
                       background: isSelected ? 'var(--bg-surface-hover)' : 'transparent',
-                      transition: 'background 0.15s ease'
                     }}
                   >
-                    <td style={{ padding: '12px 8px' }} onClick={(e) => toggleSelectRow(app.id, e)}>
+                    <td style={{ padding: '12px 10px' }} onClick={(e) => toggleSelectRow(app.id, e)}>
                       {isSelected 
                         ? <CheckSquare size={18} style={{ color: 'var(--accent-primary)' }} />
                         : <Square size={18} style={{ color: 'var(--text-muted)' }} />}
                     </td>
-                    <td style={{ padding: '12px' }}>
+                    <td style={{ padding: '12px 14px' }}>
                       <div style={{ fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                         {app.company}
                         {(app.status === 'referral' || app.referralStatus === 'connection_pending') && (
                           <span style={{
-                            background: 'rgba(236, 72, 153, 0.14)',
-                            color: '#EC4899',
+                            background: 'var(--status-referral-bg)',
+                            color: 'var(--status-referral)',
+                            border: '1px solid rgba(236, 72, 153, 0.25)',
                             fontSize: '0.68rem',
                             padding: '1px 6px',
                             borderRadius: '4px',
@@ -296,7 +297,7 @@ export default function JobTable({
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{app.title}</div>
                     </td>
-                    <td style={{ padding: '12px' }}>
+                    <td style={{ padding: '12px 14px' }}>
                       <select
                         value={app.status}
                         onChange={(e) => {
@@ -305,7 +306,7 @@ export default function JobTable({
                         }}
                         onClick={(e) => e.stopPropagation()}
                         className={`badge badge-${app.status}`}
-                        style={{ border: 'none', outline: 'none', cursor: 'pointer', fontWeight: 600 }}
+                        style={{ outline: 'none', cursor: 'pointer', fontWeight: 600, padding: '4px 10px' }}
                       >
                         {STAGES.map(s => (
                           <option key={s.id} value={s.id} style={{ background: 'var(--bg-surface)', color: 'var(--text-primary)' }}>
@@ -314,33 +315,33 @@ export default function JobTable({
                         ))}
                       </select>
                     </td>
-                    <td style={{ padding: '12px' }}>
+                    <td style={{ padding: '12px 14px' }}>
                       <span className={`badge badge-${app.priority}`}>
                         {app.priority}
                       </span>
                     </td>
                     {/* Deadline Column */}
-                    <td style={{ padding: '12px' }}>
+                    <td style={{ padding: '12px 14px' }}>
                       {(() => {
                         if (!app.deadline) return <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>None</span>;
                         const days = getDaysUntil(app.deadline);
                         if (days < 0) {
                           return (
-                            <span style={{ color: '#EF4444', fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: 'var(--status-rejected)', fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <AlertTriangle size={12} /> Expired ({app.deadline})
                             </span>
                           );
                         }
                         if (days === 0) {
                           return (
-                            <span style={{ color: '#EF4444', fontSize: '0.78rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px', animation: 'pulse 1.8s infinite' }}>
+                            <span style={{ color: 'var(--status-rejected)', fontSize: '0.78rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '4px', animation: 'pulse 1.8s infinite' }}>
                               <AlertTriangle size={12} /> 🚨 TODAY!
                             </span>
                           );
                         }
                         if (days <= 3) {
                           return (
-                            <span style={{ color: '#F59E0B', fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            <span style={{ color: 'var(--status-interview)', fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               <Clock size={12} /> ⚠️ {days}d left ({app.deadline})
                             </span>
                           );
