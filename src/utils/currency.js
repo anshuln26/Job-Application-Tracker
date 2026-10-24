@@ -62,6 +62,7 @@ export const normalizeCurrencyCode = (raw) => {
 export const convertSalary = (amount, fromCurr = 'USD', toCurr = 'INR') => {
   const num = Number(amount);
   if (!num || isNaN(num) || num <= 0) return 0;
+  if (toCurr === 'native') return num;
   
   const from = normalizeCurrencyCode(fromCurr);
   const to = normalizeCurrencyCode(toCurr);
@@ -103,8 +104,8 @@ export const monthlyizeSalary = (amount, period = 'yearly', hoursPerWeek = 40) =
 export const formatSingleSalary = (amount, currency = 'INR', period = 'yearly', compact = true) => {
   const num = Number(amount);
   if (!num || isNaN(num) || num <= 0) return 'N/A';
-  const curr = normalizeCurrencyCode(currency);
-  const symbol = curr === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === curr)?.symbol || '₹');
+  const curr = currency === 'native' ? 'INR' : normalizeCurrencyCode(currency);
+  const symbol = curr === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === curr)?.symbol || (curr === 'INR' ? '₹' : curr));
 
   if (period === 'monthly') {
     if (curr === 'INR') {
@@ -148,7 +149,7 @@ export const formatSingleSalary = (amount, currency = 'INR', period = 'yearly', 
 
 /**
  * Formats a salary range (min - max) converted to target display currency.
- * Fully supports Yearly, Monthly (Stipend), and Hourly rates!
+ * Fully supports Yearly, Monthly (Stipend), and Hourly rates, plus Native mode!
  */
 export const formatSalaryRange = (min, max, fromCurr = 'USD', targetCurr = 'INR', period = 'yearly', hoursPerWeek = 40) => {
   const minNum = Number(min) || 0;
@@ -167,17 +168,18 @@ export const formatSalaryRange = (min, max, fromCurr = 'USD', targetCurr = 'INR'
     };
   }
 
+  const isNative = targetCurr === 'native';
   const from = normalizeCurrencyCode(fromCurr);
-  const target = normalizeCurrencyCode(targetCurr);
+  const target = isNative ? from : normalizeCurrencyCode(targetCurr);
 
-  const convMin = convertSalary(minNum, from, target);
-  const convMax = convertSalary(maxNum, from, target);
+  const convMin = isNative ? minNum : convertSalary(minNum, from, target);
+  const convMax = isNative ? maxNum : convertSalary(maxNum, from, target);
 
   let targetStr = '';
   let originalStr = '';
-  const isConverted = from !== target;
-  const targetSym = target === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === target)?.symbol || '₹');
-  const origSym = from === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === from)?.symbol || from);
+  const isConverted = !isNative && from !== target;
+  const targetSym = target === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === target)?.symbol || (target === 'INR' ? '₹' : `${target} `));
+  const origSym = from === 'USD' ? '$' : (SUPPORTED_CURRENCIES.find(c => c.code === from)?.symbol || (from === 'INR' ? '₹' : `${from} `));
 
   if (period === 'monthly') {
     // Monthly format (e.g., ₹60,000 / mo or $710 / mo)
@@ -249,9 +251,17 @@ export const formatSalaryRange = (min, max, fromCurr = 'USD', targetCurr = 'INR'
           : `₹${convMin.toLocaleString('en-IN')} - ₹${convMax.toLocaleString('en-IN')}`;
       }
     } else {
-      targetStr = convMin === convMax
-        ? `${targetSym}${Math.round(convMax / 1000)}k`
-        : `${targetSym}${Math.round(convMin / 1000)}k - ${targetSym}${Math.round(convMax / 1000)}k`;
+      if (convMax >= 1000000) {
+        const minM = (convMin / 1000000).toFixed(1);
+        const maxM = (convMax / 1000000).toFixed(1);
+        targetStr = convMin === convMax ? `${targetSym}${maxM}M` : `${targetSym}${minM}M - ${targetSym}${maxM}M`;
+      } else if (convMax >= 1000) {
+        targetStr = convMin === convMax
+          ? `${targetSym}${Math.round(convMax / 1000)}k`
+          : `${targetSym}${Math.round(convMin / 1000)}k - ${targetSym}${Math.round(convMax / 1000)}k`;
+      } else {
+        targetStr = convMin === convMax ? `${targetSym}${convMax}` : `${targetSym}${convMin} - ${targetSym}${convMax}`;
+      }
     }
 
     if (isConverted) {
@@ -259,6 +269,10 @@ export const formatSalaryRange = (min, max, fromCurr = 'USD', targetCurr = 'INR'
         const origMinL = (minNum / 100000).toFixed(minNum % 100000 === 0 ? 0 : 1);
         const origMaxL = (maxNum / 100000).toFixed(maxNum % 100000 === 0 ? 0 : 1);
         originalStr = minNum === maxNum ? `₹${origMaxL}L` : `₹${origMinL}L - ₹${origMaxL}L`;
+      } else if (maxNum >= 1000000) {
+        const origMinM = (minNum / 1000000).toFixed(1);
+        const origMaxM = (maxNum / 1000000).toFixed(1);
+        originalStr = minNum === maxNum ? `${origSym}${origMaxM}M` : `${origSym}${origMinM}M - ${origSym}${origMaxM}M`;
       } else {
         originalStr = minNum === maxNum
           ? `${origSym}${Math.round(maxNum / 1000)}k`
@@ -272,7 +286,7 @@ export const formatSalaryRange = (min, max, fromCurr = 'USD', targetCurr = 'INR'
     original: originalStr,
     isConverted,
     fromCurrency: from,
-    targetCurrency: target,
+    targetCurrency: isNative ? 'native' : target,
     period: period || 'yearly',
     convertedMin: convMin,
     convertedMax: convMax

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { STAGES, WORK_TYPES, PRIORITIES } from '../data/mockData';
+import { STAGES, WORK_TYPES, PRIORITIES, VISA_STATUSES, TIMEZONE_SHIFTS } from '../data/mockData';
 import { convertSalary, formatSalaryRange, annualizeSalary } from '../utils/currency';
 import {
   ArrowUpDown,
@@ -39,6 +39,7 @@ export default function JobTable({
   const [statusFilter, setStatusFilter] = useState('all');
   const [workTypeFilter, setWorkTypeFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [visaFilter, setVisaFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState([]);
 
   // Filter & Sort Logic
@@ -53,6 +54,7 @@ export default function JobTable({
       }
       if (workTypeFilter !== 'all' && app.workType !== workTypeFilter) return false;
       if (priorityFilter !== 'all' && app.priority !== priorityFilter) return false;
+      if (visaFilter !== 'all' && (app.visaStatus || 'none') !== visaFilter) return false;
       return true;
     }).sort((a, b) => {
       let aVal = a[sortField] || '';
@@ -74,7 +76,7 @@ export default function JobTable({
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [applications, statusFilter, workTypeFilter, priorityFilter, sortField, sortDirection, displayCurrency]);
+  }, [applications, statusFilter, workTypeFilter, priorityFilter, visaFilter, sortField, sortDirection, displayCurrency]);
 
   const handleSort = (field) => {
     if (sortField === field) {
@@ -152,11 +154,23 @@ export default function JobTable({
             {PRIORITIES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
           </select>
 
-          {(statusFilter !== 'all' || workTypeFilter !== 'all' || priorityFilter !== 'all') && (
+          <select
+            className="form-select"
+            value={visaFilter}
+            onChange={(e) => setVisaFilter(e.target.value)}
+            style={{ width: '155px', padding: '6px 10px', fontSize: '0.825rem' }}
+          >
+            <option value="all">All Work Auth / Visas</option>
+            {VISA_STATUSES.filter(v => v.id !== 'none').map(v => (
+              <option key={v.id} value={v.id}>{v.badge || v.label}</option>
+            ))}
+          </select>
+
+          {(statusFilter !== 'all' || workTypeFilter !== 'all' || priorityFilter !== 'all' || visaFilter !== 'all') && (
             <button
               className="btn btn-ghost"
               style={{ padding: '4px 10px', fontSize: '0.8rem' }}
-              onClick={() => { setStatusFilter('all'); setWorkTypeFilter('all'); setPriorityFilter('all'); }}
+              onClick={() => { setStatusFilter('all'); setWorkTypeFilter('all'); setPriorityFilter('all'); setVisaFilter('all'); }}
             >
               Reset Filters
             </button>
@@ -351,7 +365,29 @@ export default function JobTable({
                       )}
                     </td>
                     <td style={{ padding: '12px', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-                      {app.workType} ({app.location || 'Remote'})
+                      <div style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                        {app.workType} ({app.location || 'Remote'})
+                      </div>
+                      {((app.visaStatus && app.visaStatus !== 'none') || (app.timezoneShift && app.timezoneShift !== 'none')) && (
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                          {app.visaStatus && app.visaStatus !== 'none' && (() => {
+                            const v = VISA_STATUSES.find(x => x.id === app.visaStatus);
+                            return v?.badge ? (
+                              <span key="visa" style={{ fontSize: '0.67rem', color: v.color, background: v.bg, padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                {v.badge}
+                              </span>
+                            ) : null;
+                          })()}
+                          {app.timezoneShift && app.timezoneShift !== 'none' && (() => {
+                            const t = TIMEZONE_SHIFTS.find(x => x.id === app.timezoneShift);
+                            return t?.badge ? (
+                              <span key="shift" style={{ fontSize: '0.67rem', color: t.color, background: t.bg, padding: '1px 5px', borderRadius: '4px', fontWeight: 600 }}>
+                                {t.badge}
+                              </span>
+                            ) : null;
+                          })()}
+                        </div>
+                      )}
                     </td>
                     <td style={{ padding: '12px', fontWeight: 600, color: app.salaryMax ? 'var(--status-offer)' : 'var(--text-muted)' }}>
                       {(() => {
@@ -364,6 +400,11 @@ export default function JobTable({
                               {period === 'monthly' && <span style={{ fontSize: '0.72rem' }}>🎓</span>}
                               <span>{sal.formatted}</span>
                             </span>
+                            {app.salaryBase > 0 && (
+                              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                                Base: {formatSalaryRange(app.salaryBase, app.salaryBase, app.currency, displayCurrency, period).formatted}
+                              </span>
+                            )}
                             {sal.isConverted && (
                               <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>
                                 Orig: {sal.original}

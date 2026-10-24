@@ -15,7 +15,57 @@ export const REFERRAL_STATUSES = [
   { id: 'declined', label: 'Declined / No Response', color: '#EF4444' }
 ];
 
-export const WORK_TYPES = ['Remote', 'Hybrid', 'Onsite'];
+export const WORK_TYPES = [
+  'Remote (India)',
+  'Remote (Global)',
+  'Hybrid',
+  'On-site',
+  'Remote'
+];
+
+export const LOCATION_PRESETS = [
+  { label: 'Bengaluru', location: 'Bengaluru, India', workType: 'Hybrid' },
+  { label: 'Hyderabad', location: 'Hyderabad, India', workType: 'Hybrid' },
+  { label: 'Pune', location: 'Pune, India', workType: 'Hybrid' },
+  { label: 'Gurugram / NCR', location: 'Gurugram, India', workType: 'Hybrid' },
+  { label: 'Mumbai', location: 'Mumbai, India', workType: 'On-site' },
+  { label: 'Noida', location: 'Noida, India', workType: 'Hybrid' },
+  { label: 'Remote (India)', location: 'Remote (India)', workType: 'Remote (India)' },
+  { label: 'Remote (Global)', location: 'Remote (Worldwide)', workType: 'Remote (Global)' },
+  { label: 'Dubai / UAE', location: 'Dubai, UAE', workType: 'On-site' },
+  { label: 'London, UK', location: 'London, UK', workType: 'Hybrid' },
+  { label: 'Berlin, Germany', location: 'Berlin, Germany', workType: 'Hybrid' },
+  { label: 'San Francisco, US', location: 'San Francisco, CA', workType: 'On-site' },
+  { label: 'Singapore', location: 'Singapore', workType: 'Hybrid' },
+  { label: 'Sydney, Australia', location: 'Sydney, Australia', workType: 'Hybrid' }
+];
+
+export const VISA_STATUSES = [
+  { id: 'none', label: 'Not Specified', badge: null, color: 'var(--text-muted)' },
+  { id: 'domestic', label: 'Indian Citizen (No Visa Needed)', badge: '🇮🇳 Domestic', color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)' },
+  { id: 'sponsored', label: 'Visa Sponsorship Provided (H-1B / UK / EU / UAE)', badge: '🛂 Visa Sponsored', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.12)' },
+  { id: 'contractor_eor', label: 'Contractor / EoR (via Deel / Remote.com)', badge: '📄 Contractor (EoR)', color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.12)' },
+  { id: 'self_sponsored', label: 'Self-Sponsored / PR / No Visa Provided', badge: '⚠️ Self-Sponsored / PR', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.12)' }
+];
+
+export const TIMEZONE_SHIFTS = [
+  { id: 'none', label: 'Not Specified', badge: null, color: 'var(--text-muted)' },
+  { id: 'ist', label: 'Standard IST (Daytime: 9 AM - 6 PM IST)', badge: '☀️ IST Daytime', color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)' },
+  { id: 'emea', label: 'EMEA / UK Shift (3-4 hrs overlap with IST)', badge: '🌍 EMEA Overlap', color: '#06B6D4', bg: 'rgba(6, 182, 212, 0.12)' },
+  { id: 'est', label: 'US East Coast / EST (Late afternoon / evening)', badge: '🌆 US EST Shift', color: '#F97316', bg: 'rgba(249, 115, 22, 0.12)' },
+  { id: 'pst', label: 'US West Coast / PST (Night shift / late overlap)', badge: '🌙 US PST Shift', color: '#EC4899', bg: 'rgba(236, 72, 153, 0.12)' },
+  { id: 'async', label: 'Flexible / Async (No mandatory core hours)', badge: '⚡ Async / Flexible', color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.12)' }
+];
+
+export const NOTICE_PERIODS = [
+  { id: 'none', label: 'Not Specified', badge: null, color: 'var(--text-muted)' },
+  { id: 'immediate', label: 'Immediate Joiner (< 15 days)', badge: '⚡ Immediate', color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)' },
+  { id: '30_days', label: '30 Days Notice', badge: '⏳ 30 Days', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.12)' },
+  { id: '60_days', label: '60 Days Notice', badge: '⏳ 60 Days', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.12)' },
+  { id: '90_days', label: '90 Days Notice (MNC / Standard)', badge: '⏳ 90 Days', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.12)' },
+  { id: 'serving', label: 'Currently Serving Notice', badge: '📢 Serving Notice', color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.12)' }
+];
+
 export const PRIORITIES = [
   { id: 'high', label: 'High Priority', color: 'var(--priority-high)', bg: 'var(--priority-high-bg)' },
   { id: 'medium', label: 'Medium Priority', color: 'var(--priority-med)', bg: 'var(--priority-med-bg)' },
@@ -254,7 +304,88 @@ export const INITIAL_APPLICATIONS = [
     resumeVersion: 'Software_Engineer_2026.pdf',
     tags: ['Open Source', 'Python', 'Internship'],
     notes: 'Monthly stipend of ₹60,000 / mo for SDE intern. Open source contribution milestone.',
+    visaStatus: 'domestic',
+    timezoneShift: 'ist',
+    noticePeriod: 'immediate',
     timeline: [],
+    interviews: []
+  },
+  {
+    id: 'job-10',
+    company: 'Monzo Bank',
+    title: 'Senior Fullstack Engineer - Payments & FinTech',
+    location: 'London, UK / Hybrid',
+    workType: 'Hybrid',
+    status: 'interviewing',
+    priority: 'high',
+    salaryMin: 85000,
+    salaryMax: 105000,
+    currency: 'GBP',
+    salaryPeriod: 'yearly',
+    salaryBase: 90000,
+    salaryBonus: 10000,
+    salaryStocks: 5000,
+    appliedDate: '2026-09-29',
+    plannedApplyDate: '',
+    deadline: '',
+    jobUrl: 'https://monzo.com/careers/senior-eng',
+    contactName: 'James Wilson',
+    contactEmail: 'j.wilson@monzo.com',
+    referralStatus: 'referral_received',
+    referralContact: 'Ankit Gupta (Senior Eng)',
+    referralRole: 'Senior Staff Engineer',
+    referralLinkedin: 'https://linkedin.com/in/ankit-gupta-tech',
+    referralDate: '2026-09-25',
+    resumeVersion: 'Software_Engineer_2026.pdf',
+    visaStatus: 'sponsored',
+    timezoneShift: 'emea',
+    noticePeriod: '30_days',
+    tags: ['FinTech', 'React', 'Go', 'UK Skilled Worker'],
+    notes: 'UK Skilled Worker Visa sponsorship confirmed by HR. 3-4 hours overlap with IST makes collaboration seamless.',
+    timeline: [
+      { id: 't1', stage: 'Referral Received', date: '2026-09-25', notes: 'Referred by Ankit from London office.' },
+      { id: 't2', stage: 'Applied', date: '2026-09-29', notes: 'Official application submitted.' },
+      { id: 't3', stage: 'Recruiter Chat', date: '2026-10-04', notes: 'Discussed visa timeline and UK relocation support.' }
+    ],
+    interviews: [
+      { id: 'i1', title: 'Technical Architecture Round', date: '2026-10-12T16:00', type: 'System Design', completed: false }
+    ]
+  },
+  {
+    id: 'job-11',
+    company: 'Careem (Uber)',
+    title: 'Staff Frontend Architect - Super App Platform',
+    location: 'Dubai, UAE',
+    workType: 'On-site',
+    status: 'wishlist',
+    priority: 'high',
+    salaryMin: 260000,
+    salaryMax: 320000,
+    currency: 'AED',
+    salaryPeriod: 'yearly',
+    salaryBase: 280000,
+    salaryBonus: 40000,
+    salaryStocks: 0,
+    appliedDate: '',
+    plannedApplyDate: '2026-10-29',
+    deadline: '2026-11-05',
+    jobUrl: 'https://careem.com/careers/dubai-fe-lead',
+    contactName: 'Dubai Talent Acquisition',
+    contactEmail: 'careers@careem.com',
+    referralStatus: 'connection_pending',
+    referralContact: 'Rohan Mehra',
+    referralRole: 'Director of Engineering',
+    referralLinkedin: 'https://linkedin.com/in/rohan-mehra-dxb',
+    referralDate: '2026-10-20',
+    resumeVersion: 'Software_Engineer_2026.pdf',
+    visaStatus: 'sponsored',
+    timezoneShift: 'emea',
+    noticePeriod: '30_days',
+    tags: ['Dubai Tech', 'Zero Income Tax', 'React', 'High Pay'],
+    notes: 'Tax-free compensation in UAE dirhams (AED). UAE Green Visa sponsored by Careem. Direct flights to India.',
+    timeline: [
+      { id: 't1', stage: 'Connection Request Sent', date: '2026-10-20', notes: 'Sent connection note on LinkedIn to Rohan.' }
+    ],
     interviews: []
   }
 ];

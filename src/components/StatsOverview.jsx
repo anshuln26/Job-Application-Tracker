@@ -25,9 +25,12 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
     a.salaryPeriod !== 'monthly' && (!a.title || !a.title.toLowerCase().includes('intern'))
   );
 
+  const isAutoDefaultIntern = fulltimeApps.length === 0 && internApps.length > 0;
   const effectivePayMode = payMetricMode === 'auto'
-    ? (fulltimeApps.length === 0 && internApps.length > 0 ? 'intern' : 'annual')
+    ? (isAutoDefaultIntern ? 'intern' : 'annual')
     : payMetricMode;
+
+  const kpiCurrency = displayCurrency === 'native' ? 'INR' : displayCurrency;
 
   // Average Annual Salary (Full-time)
   const avgAnnualSalary = fulltimeApps.length > 0
@@ -35,8 +38,8 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
         fulltimeApps.reduce((acc, a) => {
           const annMin = annualizeSalary(a.salaryMin, a.salaryPeriod, a.hoursPerWeek);
           const annMax = annualizeSalary(a.salaryMax, a.salaryPeriod, a.hoursPerWeek);
-          const minConv = convertSalary(annMin, a.currency, displayCurrency);
-          const maxConv = convertSalary(annMax, a.currency, displayCurrency);
+          const minConv = convertSalary(annMin, a.currency, kpiCurrency);
+          const maxConv = convertSalary(annMax, a.currency, kpiCurrency);
           return acc + (minConv + maxConv) / 2;
         }, 0) / fulltimeApps.length
       )
@@ -48,8 +51,8 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
         internApps.reduce((acc, a) => {
           const mMin = monthlyizeSalary(a.salaryMin, a.salaryPeriod, a.hoursPerWeek);
           const mMax = monthlyizeSalary(a.salaryMax, a.salaryPeriod, a.hoursPerWeek);
-          const minConv = convertSalary(mMin, a.currency, displayCurrency);
-          const maxConv = convertSalary(mMax, a.currency, displayCurrency);
+          const minConv = convertSalary(mMin, a.currency, kpiCurrency);
+          const maxConv = convertSalary(mMax, a.currency, kpiCurrency);
           return acc + (minConv + maxConv) / 2;
         }, 0) / internApps.length
       )
@@ -211,8 +214,8 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
                 {onToggleCurrency && (
                   <button
                     type="button"
-                    onClick={() => onToggleCurrency(displayCurrency === 'INR' ? 'USD' : 'INR')}
-                    title={`Switch to ${displayCurrency === 'INR' ? 'USD ($)' : 'INR (₹)'}`}
+                    onClick={() => onToggleCurrency(displayCurrency === 'INR' ? 'USD' : (displayCurrency === 'USD' ? 'native' : 'INR'))}
+                    title={`Current: ${displayCurrency === 'native' ? 'Native Currencies' : displayCurrency}. Click to switch.`}
                     style={{
                       background: 'var(--bg-surface)',
                       border: '1px solid var(--border-color)',
@@ -227,7 +230,7 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
                       gap: '3px'
                     }}
                   >
-                    <span>{displayCurrency === 'INR' ? '₹' : '$'}</span>
+                    <span>{displayCurrency === 'INR' ? '₹' : (displayCurrency === 'USD' ? '$' : '🌐')}</span>
                     <span style={{ opacity: 0.6 }}>⇄</span>
                   </button>
                 )}
@@ -237,8 +240,8 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
             {/* Metric Value */}
             <div style={{ fontSize: '1.75rem', fontWeight: 800, marginTop: '4px', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
               {effectivePayMode === 'intern'
-                ? (avgMonthlyStipend ? formatSingleSalary(avgMonthlyStipend, displayCurrency, 'monthly') : 'N/A')
-                : (avgAnnualSalary ? formatSingleSalary(avgAnnualSalary, displayCurrency, 'yearly') : 'N/A')}
+                ? (avgMonthlyStipend ? formatSingleSalary(avgMonthlyStipend, kpiCurrency, 'monthly') : 'N/A')
+                : (avgAnnualSalary ? formatSingleSalary(avgAnnualSalary, kpiCurrency, 'yearly') : 'N/A')}
             </div>
           </div>
 
@@ -261,8 +264,9 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
         {/* Footer Subtitle */}
         <div style={{ marginTop: '12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
           {effectivePayMode === 'intern'
-            ? `Based on ${internApps.length} monthly intern stipend target(s)`
-            : `Based on ${fulltimeApps.length} full-time annual target(s)`}
+            ? `Based on ${internApps.length} monthly stipend target(s)`
+            : `Based on ${fulltimeApps.length} full-time target(s)`}
+          {displayCurrency === 'native' ? ' · Showing Native on cards (Total in ₹)' : ''}
           {fulltimeApps.length > 0 && internApps.length > 0 && ' · Click pill to switch'}
         </div>
       </div>

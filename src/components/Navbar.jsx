@@ -196,6 +196,31 @@ export default function Navbar({
                 <span>🇺🇸</span>
                 <span>$ USD</span>
               </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setDisplayCurrency('native')}
+                title="Display each job in its original stated currency (INR, USD, GBP, EUR, AED, etc.)"
+                style={{
+                  padding: '4px 10px',
+                  fontSize: '0.78rem',
+                  fontWeight: displayCurrency === 'native' ? 700 : 500,
+                  background: displayCurrency === 'native' ? 'var(--accent-primary)' : 'transparent',
+                  color: displayCurrency === 'native' ? '#fff' : 'var(--text-secondary)',
+                  borderRadius: '7px',
+                  border: 'none',
+                  height: '32px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  boxShadow: displayCurrency === 'native' ? '0 2px 8px var(--accent-glow)' : 'none'
+                }}
+              >
+                <span>🌐</span>
+                <span>Native</span>
+              </button>
             </div>
           )}
 

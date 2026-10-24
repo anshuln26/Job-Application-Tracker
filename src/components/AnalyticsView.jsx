@@ -36,15 +36,16 @@ export default function AnalyticsView({ applications, displayCurrency = 'INR' })
   }));
 
   // Data 3: Top Salaries Comparison normalized to displayCurrency (INR or USD)
-  const isINR = displayCurrency === 'INR';
+  const chartCurrency = displayCurrency === 'native' ? 'INR' : displayCurrency;
+  const isINR = chartCurrency === 'INR';
   const salaryData = applications
     .filter(a => a.salaryMax > 0)
     .map(a => {
       const period = a.salaryPeriod || ((a.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
       const annMin = annualizeSalary(a.salaryMin, period, a.hoursPerWeek);
       const annMax = annualizeSalary(a.salaryMax, period, a.hoursPerWeek);
-      const convMin = convertSalary(annMin, a.currency, displayCurrency);
-      const convMax = convertSalary(annMax, a.currency, displayCurrency);
+      const convMin = convertSalary(annMin, a.currency, chartCurrency);
+      const convMax = convertSalary(annMax, a.currency, chartCurrency);
       const isIntern = period === 'monthly' || (a.title || '').toLowerCase().includes('intern');
       return {
         company: (a.company.length > 8 ? a.company.substring(0, 8) + '..' : a.company) + (isIntern ? ' (Intern)' : ''),

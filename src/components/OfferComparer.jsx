@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Scale, Trophy, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { convertSalary, formatSalaryRange, annualizeSalary } from '../utils/currency';
+import { VISA_STATUSES } from '../data/mockData';
 
 export default function OfferComparer({ applications, displayCurrency = 'INR' }) {
   const offerApps = applications.filter(a => a.status === 'offer' || a.status === 'interviewing');
@@ -169,10 +170,21 @@ export default function OfferComparer({ applications, displayCurrency = 'INR' })
                       })()}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ color: 'var(--text-secondary)' }}>Work Model:</span>
                     <strong>{app.workType} ({app.location || 'Remote'})</strong>
                   </div>
+                  {app.visaStatus && app.visaStatus !== 'none' && (() => {
+                    const v = VISA_STATUSES.find(x => x.id === app.visaStatus);
+                    return v?.badge ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>Visa / Auth:</span>
+                        <span style={{ fontSize: '0.72rem', color: v.color, background: v.bg, padding: '2px 7px', borderRadius: '4px', fontWeight: 600 }}>
+                          {v.badge}
+                        </span>
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
 
                 {/* Interactive Rating Sliders */}

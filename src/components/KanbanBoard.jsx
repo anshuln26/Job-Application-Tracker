@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { STAGES } from '../data/mockData';
+import { STAGES, VISA_STATUSES, TIMEZONE_SHIFTS, NOTICE_PERIODS } from '../data/mockData';
 import {
   Plus,
   MapPin,
@@ -261,6 +261,83 @@ export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus,
                           {app.workType}
                         </span>
                       </div>
+
+                      {/* Global Preferences Badges: Visa, Shift, Notice */}
+                      {((app.visaStatus && app.visaStatus !== 'none') || (app.timezoneShift && app.timezoneShift !== 'none') || (app.noticePeriod && app.noticePeriod !== 'none')) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', marginBottom: '8px', fontSize: '0.68rem' }}>
+                          {app.visaStatus && app.visaStatus !== 'none' && (() => {
+                            const v = VISA_STATUSES.find(x => x.id === app.visaStatus);
+                            if (!v || !v.badge) return null;
+                            return (
+                              <span
+                                key="visa"
+                                style={{
+                                  background: v.bg || 'rgba(59, 130, 246, 0.1)',
+                                  color: v.color || '#3b82f6',
+                                  border: `1px solid ${v.color}33`,
+                                  padding: '1px 6px',
+                                  borderRadius: '5px',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
+                                }}
+                                title={v.label}
+                              >
+                                {v.badge}
+                              </span>
+                            );
+                          })()}
+
+                          {app.timezoneShift && app.timezoneShift !== 'none' && (() => {
+                            const t = TIMEZONE_SHIFTS.find(x => x.id === app.timezoneShift);
+                            if (!t || !t.badge) return null;
+                            return (
+                              <span
+                                key="shift"
+                                style={{
+                                  background: t.bg || 'rgba(6, 182, 212, 0.1)',
+                                  color: t.color || '#06b6d4',
+                                  border: `1px solid ${t.color}33`,
+                                  padding: '1px 6px',
+                                  borderRadius: '5px',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
+                                }}
+                                title={t.label}
+                              >
+                                {t.badge}
+                              </span>
+                            );
+                          })()}
+
+                          {app.noticePeriod && app.noticePeriod !== 'none' && (() => {
+                            const n = NOTICE_PERIODS.find(x => x.id === app.noticePeriod);
+                            if (!n || !n.badge) return null;
+                            return (
+                              <span
+                                key="notice"
+                                style={{
+                                  background: n.bg || 'rgba(16, 185, 129, 0.1)',
+                                  color: n.color || '#10b981',
+                                  border: `1px solid ${n.color}33`,
+                                  padding: '1px 6px',
+                                  borderRadius: '5px',
+                                  fontWeight: 600,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '3px'
+                                }}
+                                title={app.noticeEndDate ? `${n.label} (LWD: ${app.noticeEndDate})` : n.label}
+                              >
+                                {n.badge}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      )}
 
                       {/* Deadline Warning Alert Badge */}
                       {(() => {

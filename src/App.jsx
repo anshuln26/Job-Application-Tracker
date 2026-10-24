@@ -21,9 +21,19 @@ const THEME_KEY = 'careertrack_theme_v1';
 const META_TAG_START = '<!-- CT_META:';
 const META_TAG_END = ':CT_META -->';
 
-const serializeNotesWithMeta = (notesText, meta) => {
+const serializeNotesWithMeta = (notesText, meta = {}) => {
   const cleanNotes = (notesText || '').replace(/<!-- CT_META:[\s\S]*?:CT_META -->/g, '').trim();
   const metaPayload = {
+    currency: meta.currency || null,
+    salaryPeriod: meta.salaryPeriod || null,
+    hoursPerWeek: meta.hoursPerWeek || null,
+    salaryBase: meta.salaryBase || null,
+    salaryBonus: meta.salaryBonus || null,
+    salaryStocks: meta.salaryStocks || null,
+    visaStatus: meta.visaStatus || null,
+    timezoneShift: meta.timezoneShift || null,
+    noticePeriod: meta.noticePeriod || null,
+    noticeEndDate: meta.noticeEndDate || null,
     deadline: meta.deadline || null,
     plannedApplyDate: meta.plannedApplyDate || null,
     referralStatus: meta.referralStatus || 'none',
@@ -78,6 +88,13 @@ const mapToDb = (app, userId) => ({
     currency: app.currency,
     salaryPeriod: app.salaryPeriod,
     hoursPerWeek: app.hoursPerWeek,
+    salaryBase: app.salaryBase,
+    salaryBonus: app.salaryBonus,
+    salaryStocks: app.salaryStocks,
+    visaStatus: app.visaStatus,
+    timezoneShift: app.timezoneShift,
+    noticePeriod: app.noticePeriod,
+    noticeEndDate: app.noticeEndDate,
     deadline: app.deadline,
     plannedApplyDate: app.plannedApplyDate,
     referralStatus: app.referralStatus,
@@ -107,6 +124,13 @@ const mapFromDb = (item) => {
     currency: item.currency || meta.currency || 'INR',
     salaryPeriod: item.salary_period || meta.salaryPeriod || (isIntern ? 'monthly' : 'yearly'),
     hoursPerWeek: Number(item.hours_per_week || meta.hoursPerWeek) || 40,
+    salaryBase: Number(item.salary_base || meta.salaryBase) || 0,
+    salaryBonus: Number(item.salary_bonus || meta.salaryBonus) || 0,
+    salaryStocks: Number(item.salary_stocks || meta.salaryStocks) || 0,
+    visaStatus: item.visa_status || meta.visaStatus || 'none',
+    timezoneShift: item.timezone_shift || meta.timezoneShift || 'none',
+    noticePeriod: item.notice_period || meta.noticePeriod || 'none',
+    noticeEndDate: item.notice_end_date || meta.noticeEndDate || '',
     appliedDate: item.applied_date,
     plannedApplyDate: item.planned_apply_date || meta.plannedApplyDate || '',
     deadline: item.deadline || meta.deadline || '',
