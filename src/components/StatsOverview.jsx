@@ -76,11 +76,24 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
       {/* Total Applications */}
       <div className="glass-panel glass-panel-interactive" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Total Applications</span>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', letterSpacing: '-0.02em' }}>{total}</div>
           </div>
-          <div style={{ background: 'var(--status-applied-bg)', padding: '10px', borderRadius: '12px', color: 'var(--status-applied)' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            minWidth: '42px',
+            minHeight: '42px',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--status-applied-bg)',
+            color: 'var(--status-applied)',
+            flexShrink: 0,
+            marginLeft: '12px'
+          }}>
             <Send size={20} />
           </div>
         </div>
@@ -92,13 +105,26 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
       {/* Response Rate */}
       <div className="glass-panel glass-panel-interactive" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Response Rate</span>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', letterSpacing: '-0.02em', color: responseRate > 25 ? 'var(--status-offer)' : 'var(--text-primary)' }}>
               {responseRate}%
             </div>
           </div>
-          <div style={{ background: 'var(--status-wishlist-bg)', padding: '10px', borderRadius: '12px', color: 'var(--status-wishlist)' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            minWidth: '42px',
+            minHeight: '42px',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--status-wishlist-bg)',
+            color: 'var(--status-wishlist)',
+            flexShrink: 0,
+            marginLeft: '12px'
+          }}>
             <Percent size={20} />
           </div>
         </div>
@@ -110,13 +136,26 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
       {/* Active Interviews */}
       <div className="glass-panel glass-panel-interactive" style={{ padding: '20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Active Interviews</span>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', color: 'var(--status-interview)' }}>
               {interviewingCount}
             </div>
           </div>
-          <div style={{ background: 'var(--status-interview-bg)', padding: '10px', borderRadius: '12px', color: 'var(--status-interview)' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            minWidth: '42px',
+            minHeight: '42px',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--status-interview-bg)',
+            color: 'var(--status-interview)',
+            flexShrink: 0,
+            marginLeft: '12px'
+          }}>
             <Calendar size={20} />
           </div>
         </div>
@@ -128,7 +167,7 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
       {/* Job Offers */}
       <div className={`glass-panel glass-panel-interactive ${offerCount > 0 ? 'pulse-offer' : ''}`} style={{ padding: '20px', borderColor: offerCount > 0 ? 'rgba(16, 185, 129, 0.4)' : '' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Offers Received</span>
             <div style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '4px', color: 'var(--status-offer)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               {offerCount}
@@ -143,7 +182,20 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
               )}
             </div>
           </div>
-          <div style={{ background: 'var(--status-offer-bg)', padding: '10px', borderRadius: '12px', color: 'var(--status-offer)' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            minWidth: '42px',
+            minHeight: '42px',
+            borderRadius: '12px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'var(--status-offer-bg)',
+            color: 'var(--status-offer)',
+            flexShrink: 0,
+            marginLeft: '12px'
+          }}>
             <Trophy size={20} />
           </div>
         </div>
@@ -246,15 +298,17 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
           </div>
 
           <div style={{
-            background: effectivePayMode === 'intern' ? 'rgba(236, 72, 153, 0.12)' : 'rgba(99, 102, 241, 0.12)',
-            padding: '10px',
+            width: '42px',
+            height: '42px',
+            minWidth: '42px',
+            minHeight: '42px',
             borderRadius: '12px',
-            color: effectivePayMode === 'intern' ? '#EC4899' : 'var(--accent-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            minWidth: '40px',
-            minHeight: '40px',
+            background: effectivePayMode === 'intern' ? 'rgba(236, 72, 153, 0.12)' : 'rgba(99, 102, 241, 0.12)',
+            color: effectivePayMode === 'intern' ? '#EC4899' : 'var(--accent-primary)',
+            flexShrink: 0,
             marginLeft: '12px'
           }}>
             {effectivePayMode === 'intern' ? <GraduationCap size={20} /> : <Briefcase size={20} />}
