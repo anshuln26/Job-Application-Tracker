@@ -30,6 +30,8 @@ const serializeNotesWithMeta = (notesText, meta = {}) => {
     salaryBase: meta.salaryBase || null,
     salaryBonus: meta.salaryBonus || null,
     salaryStocks: meta.salaryStocks || null,
+    salaryUndisclosed: Boolean(meta.salaryUndisclosed),
+    resumeCuration: meta.resumeCuration || 'not_needed',
     visaStatus: meta.visaStatus || null,
     timezoneShift: meta.timezoneShift || null,
     noticePeriod: meta.noticePeriod || null,
@@ -77,6 +79,8 @@ const mapToDb = (app, userId) => ({
   priority: app.priority || 'medium',
   salary_min: Number(app.salaryMin) || 0,
   salary_max: Number(app.salaryMax) || 0,
+  salary_undisclosed: Boolean(app.salaryUndisclosed),
+  resume_curation: app.resumeCuration || 'not_needed',
   currency: app.currency || 'INR',
   applied_date: app.appliedDate || (app.plannedApplyDate || new Date().toISOString().split('T')[0]),
   job_url: app.jobUrl || '',
@@ -91,6 +95,8 @@ const mapToDb = (app, userId) => ({
     salaryBase: app.salaryBase,
     salaryBonus: app.salaryBonus,
     salaryStocks: app.salaryStocks,
+    salaryUndisclosed: app.salaryUndisclosed,
+    resumeCuration: app.resumeCuration,
     visaStatus: app.visaStatus,
     timezoneShift: app.timezoneShift,
     noticePeriod: app.noticePeriod,
@@ -121,6 +127,8 @@ const mapFromDb = (item) => {
     priority: item.priority || 'medium',
     salaryMin: Number(item.salary_min) || 0,
     salaryMax: Number(item.salary_max) || 0,
+    salaryUndisclosed: Boolean(item.salary_undisclosed ?? meta.salaryUndisclosed),
+    resumeCuration: item.resume_curation || meta.resumeCuration || 'not_needed',
     currency: item.currency || meta.currency || 'INR',
     salaryPeriod: item.salary_period || meta.salaryPeriod || (isIntern ? 'monthly' : 'yearly'),
     hoursPerWeek: Number(item.hours_per_week || meta.hoursPerWeek) || 40,
@@ -151,12 +159,18 @@ const mapFromDb = (item) => {
   };
 };
 
+const getUserStorageKey = (u) => (u && u.id ? `careertrack_apps_${u.id}` : 'careertrack_apps_guest');
+
 export default function App() {
-  // Load Applications from LocalStorage or Initial Mock Data
+  // User Auth State
+  const [user, setUser] = useState(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // Load Applications from LocalStorage or Initial Mock Data based on active user
   const [applications, setApplications] = useState(() => {
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : INITIAL_APPLICATIONS;
+      const savedGuest = localStorage.getItem('careertrack_apps_guest') || localStorage.getItem(LOCAL_STORAGE_KEY);
+      return savedGuest ? JSON.parse(savedGuest) : INITIAL_APPLICATIONS;
     } catch (e) {
       console.error('Failed to parse saved applications:', e);
       return INITIAL_APPLICATIONS;
@@ -178,10 +192,6 @@ export default function App() {
     localStorage.setItem(CURRENCY_KEY, displayCurrency);
   }, [displayCurrency]);
 
-  // User Auth State
-  const [user, setUser] = useState(null);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-
   // UI View States
   const [activeView, setActiveView] = useState('kanban'); // 'kanban', 'table', 'analytics', 'calendar', 'comparer'
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,7 +207,7 @@ export default function App() {
     setToast({ message, type });
   };
 
-  // Sync Auth State
+  // Sync Auth State with Supabase
   useEffect(() => {
     if (!supabase) return;
 
@@ -212,48 +222,74 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch from Supabase when user logs in
+  // When user signs in or changes, switch to their personal isolated vault
   useEffect(() => {
-    if (!user || !supabase) return;
+    if (!user) return;
 
-    const fetchSupabaseApps = async () => {
+    let isMounted = true;
+    const userKey = getUserStorageKey(user);
+
+    const loadUserData = async () => {
+      // 1. Load local personal user vault if available
+      try {
+        const localUserData = localStorage.getItem(userKey);
+        if (localUserData && isMounted) {
+          setApplications(JSON.parse(localUserData));
+        }
+      } catch (e) {
+        console.error('Failed to load local user cache:', e);
+      }
+
+      if (!supabase) return;
+
+      // 2. Fetch latest user records from Supabase cloud database
       try {
         const { data, error } = await supabase
           .from('applications')
           .select('*')
+          .eq('user_id', user.id)
           .order('applied_date', { ascending: false });
 
         if (error) throw error;
-        if (data && data.length > 0) {
-          setApplications(data.map(mapFromDb));
-        } else {
-          // If first-time user has no cloud applications, sync initial/local items
-          const localSaved = localStorage.getItem(LOCAL_STORAGE_KEY);
-          const initialLocal = localSaved ? JSON.parse(localSaved) : [];
+        if (data && data.length > 0 && isMounted) {
+          const loaded = data.map(mapFromDb);
+          setApplications(loaded);
+          localStorage.setItem(userKey, JSON.stringify(loaded));
+        } else if (isMounted) {
+          const localSaved = localStorage.getItem(userKey) || localStorage.getItem(LOCAL_STORAGE_KEY);
+          const initialLocal = localSaved ? JSON.parse(localSaved) : INITIAL_APPLICATIONS;
           if (initialLocal.length > 0) {
             const rowsToInsert = initialLocal.map(a => mapToDb(a, user.id));
             await supabase.from('applications').upsert(rowsToInsert);
             setApplications(initialLocal);
-            showToast('Synchronized local job data to your Supabase cloud account!');
+            localStorage.setItem(userKey, JSON.stringify(initialLocal));
+            showToast('Personal cloud vault initialized for your account!');
           }
         }
       } catch (err) {
         console.error('Failed to fetch from Supabase:', err);
-        showToast('Could not load cloud applications. Using local storage.', 'error');
       }
     };
 
-    fetchSupabaseApps();
+    loadUserData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
-  // Sync LocalStorage & Theme attribute
+  // Sync LocalStorage whenever applications or active user changes
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(applications));
+      const key = getUserStorageKey(user);
+      localStorage.setItem(key, JSON.stringify(applications));
+      if (!user) {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(applications));
+      }
     } catch (e) {
       console.error('Failed to save applications:', e);
     }
-  }, [applications]);
+  }, [applications, user]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -397,9 +433,35 @@ export default function App() {
 
   const handleSignOut = async () => {
     if (supabase) {
-      await supabase.auth.signOut();
-      setUser(null);
-      showToast('Signed out of Supabase Cloud.');
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.error('Sign out error:', err);
+      }
+    }
+    setUser(null);
+    try {
+      const guestSaved = localStorage.getItem('careertrack_apps_guest');
+      setApplications(guestSaved ? JSON.parse(guestSaved) : INITIAL_APPLICATIONS);
+    } catch {
+      setApplications(INITIAL_APPLICATIONS);
+    }
+    showToast('Signed out. Switched to guest workspace.');
+  };
+
+  const handleSyncAllToCloud = async () => {
+    if (!user || !supabase) {
+      showToast('Please sign in to a personal vault first.', 'error');
+      return;
+    }
+    try {
+      const rows = applications.map(a => mapToDb(a, user.id));
+      const { error } = await supabase.from('applications').upsert(rows);
+      if (error) throw error;
+      showToast(`Successfully synchronized ${rows.length} applications to your cloud database!`);
+    } catch (err) {
+      console.error('Cloud sync error:', err);
+      showToast(`Cloud sync error: ${err.message || 'Please check database connection in Settings'}`, 'error');
     }
   };
 
@@ -601,6 +663,10 @@ export default function App() {
           setIsAuthModalOpen(false);
         }}
         showToast={showToast}
+        user={user}
+        onSignOut={handleSignOut}
+        onSyncToCloud={handleSyncAllToCloud}
+        applicationsCount={applications.length}
       />
 
       {/* Confirmation Modal */}

@@ -1,16 +1,52 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Calendar, User, FileText, Briefcase, Users, Clock, ExternalLink, CheckCircle2, Globe, DollarSign, ChevronDown, ChevronUp } from 'lucide-react';
-import { STAGES, WORK_TYPES, PRIORITIES, REFERRAL_STATUSES, VISA_STATUSES, TIMEZONE_SHIFTS, NOTICE_PERIODS, LOCATION_PRESETS } from '../data/mockData';
+import {
+  X,
+  Plus,
+  Trash2,
+  Calendar,
+  User,
+  FileText,
+  Briefcase,
+  Users,
+  Clock,
+  ExternalLink,
+  CheckCircle2,
+  Globe,
+  DollarSign,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  AlertCircle
+} from 'lucide-react';
+import {
+  STAGES,
+  WORK_TYPES,
+  PRIORITIES,
+  REFERRAL_STATUSES,
+  VISA_STATUSES,
+  TIMEZONE_SHIFTS,
+  NOTICE_PERIODS,
+  LOCATION_PRESETS
+} from '../data/mockData';
 import { SUPPORTED_CURRENCIES, SALARY_PERIODS, formatSalaryRange, annualizeSalary } from '../utils/currency';
+import { getSavedLocations, saveCustomLocation, removeCustomLocation } from '../utils/location';
 
 const createInitialFormData = (application, initialStage, displayCurrency = 'INR') => {
+  const isPendingStage = initialStage === 'wishlist' || initialStage === 'referral';
   if (application) {
     const isIntern = (application.title || '').toLowerCase().includes('intern');
+    const isUndisclosed = Boolean(
+      application.salaryUndisclosed ||
+      (Number(application.salaryMin) === 0 && Number(application.salaryMax) === 0)
+    );
     return {
       ...application,
       currency: application.currency || (displayCurrency === 'native' ? 'INR' : (displayCurrency || 'INR')),
       salaryPeriod: application.salaryPeriod || (isIntern ? 'monthly' : 'yearly'),
       hoursPerWeek: application.hoursPerWeek || 40,
+      salaryUndisclosed: isUndisclosed,
+      salaryMin: isUndisclosed ? 0 : (Number(application.salaryMin) || 0),
+      salaryMax: isUndisclosed ? 0 : (Number(application.salaryMax) || 0),
       salaryBase: application.salaryBase || 0,
       salaryBonus: application.salaryBonus || 0,
       salaryStocks: application.salaryStocks || 0,
@@ -18,8 +54,10 @@ const createInitialFormData = (application, initialStage, displayCurrency = 'INR
       timezoneShift: application.timezoneShift || 'none',
       noticePeriod: application.noticePeriod || 'none',
       noticeEndDate: application.noticeEndDate || '',
+      appliedDate: application.appliedDate || '',
       plannedApplyDate: application.plannedApplyDate || '',
       deadline: application.deadline || '',
+      resumeCuration: application.resumeCuration || (isPendingStage ? 'pending' : 'curated'),
       referralStatus: application.referralStatus || 'none',
       referralContact: application.referralContact || '',
       referralRole: application.referralRole || '',
@@ -32,7 +70,6 @@ const createInitialFormData = (application, initialStage, displayCurrency = 'INR
     };
   }
   const today = new Date().toISOString().split('T')[0];
-  const isINR = (displayCurrency || 'INR') === 'INR';
   return {
     id: 'job-' + Date.now(),
     company: '',
@@ -41,8 +78,9 @@ const createInitialFormData = (application, initialStage, displayCurrency = 'INR
     workType: 'Remote (India)',
     status: initialStage || 'applied',
     priority: 'medium',
-    salaryMin: isINR ? 1800000 : 120000,
-    salaryMax: isINR ? 2800000 : 150000,
+    salaryUndisclosed: false,
+    salaryMin: 0,
+    salaryMax: 0,
     currency: displayCurrency === 'native' ? 'INR' : (displayCurrency || 'INR'),
     salaryPeriod: 'yearly',
     hoursPerWeek: 40,
@@ -53,9 +91,10 @@ const createInitialFormData = (application, initialStage, displayCurrency = 'INR
     timezoneShift: 'none',
     noticePeriod: 'none',
     noticeEndDate: '',
-    appliedDate: initialStage === 'applied' ? today : '',
-    plannedApplyDate: initialStage === 'wishlist' || initialStage === 'referral' ? today : '',
+    appliedDate: isPendingStage ? '' : today,
+    plannedApplyDate: isPendingStage ? today : '',
     deadline: '',
+    resumeCuration: isPendingStage ? 'pending' : 'curated',
     referralStatus: initialStage === 'referral' ? 'connection_pending' : 'none',
     referralContact: '',
     referralRole: '',
@@ -83,6 +122,8 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
   const [showSalaryBreakdown, setShowSalaryBreakdown] = useState(
     Boolean(application && (application.salaryBase > 0 || application.salaryBonus > 0 || application.salaryStocks > 0))
   );
+  const [savedLocations, setSavedLocations] = useState(() => getSavedLocations());
+  const [dateError, setDateError] = useState('');
 
   if (!isOpen) return null;
 
@@ -94,6 +135,18 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
           next.salaryPeriod = 'monthly';
           next.salaryMin = (prev.currency || 'INR') === 'INR' ? 40000 : 2000;
           next.salaryMax = (prev.currency || 'INR') === 'INR' ? 60000 : 3000;
+        }
+      }
+      if (field === 'status') {
+        const isNowPending = val === 'wishlist' || val === 'referral';
+        if (isNowPending) {
+          if (!next.plannedApplyDate) {
+            next.plannedApplyDate = new Date().toISOString().split('T')[0];
+          }
+        } else {
+          if (!next.appliedDate) {
+            next.appliedDate = new Date().toISOString().split('T')[0];
+          }
         }
       }
       return next;
@@ -143,7 +196,27 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setDateError('');
+
     if (!formData.company || !formData.title) return;
+
+    const isPending = formData.status === 'wishlist' || formData.status === 'referral';
+    if (isPending && !formData.plannedApplyDate) {
+      setDateError('Planned Apply Date is required for applications in Wishlist or Waiting for Referral stage.');
+      setActiveTab('info');
+      return;
+    }
+    if (!isPending && !formData.appliedDate) {
+      setDateError('Actual Applied Date is required for submitted applications.');
+      setActiveTab('info');
+      return;
+    }
+
+    // Automatically save new location to recommendations
+    if (formData.location && formData.location.trim().length > 1) {
+      saveCustomLocation(formData.location);
+    }
+
     onSave(formData);
     onClose();
   };
@@ -322,18 +395,45 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                 </select>
               </div>
 
+              {/* Location with custom recommendations */}
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                <label className="form-label">Location</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label className="form-label" style={{ margin: 0 }}>Location</label>
+                  {formData.location && formData.location.trim().length > 1 && !savedLocations.some(l => l.toLowerCase() === formData.location.trim().toLowerCase()) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        saveCustomLocation(formData.location);
+                        setSavedLocations(getSavedLocations());
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--accent-primary)',
+                        fontSize: '0.74rem',
+                        cursor: 'pointer',
+                        fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px'
+                      }}
+                    >
+                      <span>⭐ Save "{formData.location}" to recommendations</span>
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   className="form-input"
-                  placeholder="e.g. Bengaluru, India or San Francisco, CA"
+                  placeholder="e.g. Bengaluru, India or Seoul, South Korea"
                   value={formData.location}
                   onChange={(e) => handleChange('location', e.target.value)}
                 />
+
+                {/* Standard Popular Presets */}
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '8px' }}>
                   <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', marginRight: '2px' }}>
-                    Quick presets:
+                    Popular:
                   </span>
                   {LOCATION_PRESETS.map(loc => {
                     const isSelected = formData.location === loc.location;
@@ -361,11 +461,183 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                     );
                   })}
                 </div>
+
+                {/* User's Saved Custom Locations */}
+                {savedLocations.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: '6px' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', display: 'inline-flex', alignItems: 'center', marginRight: '2px', fontWeight: 700 }}>
+                      ⭐ My Recommendations:
+                    </span>
+                    {savedLocations.map(locStr => {
+                      const isSelected = formData.location.toLowerCase() === locStr.toLowerCase();
+                      return (
+                        <span
+                          key={locStr}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            fontSize: '0.72rem',
+                            borderRadius: '12px',
+                            background: isSelected ? 'var(--accent-primary)' : 'var(--bg-surface-hover)',
+                            color: isSelected ? '#fff' : 'var(--text-secondary)',
+                            border: isSelected ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
+                            padding: '2px 8px',
+                            gap: '4px'
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleChange('location', locStr)}
+                            style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, font: 'inherit' }}
+                          >
+                            {locStr}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeCustomLocation(locStr);
+                              setSavedLocations(getSavedLocations());
+                            }}
+                            title="Remove from recommendations"
+                            style={{ background: 'none', border: 'none', color: isSelected ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)', cursor: 'pointer', padding: 0, fontSize: '0.75rem', lineHeight: 1 }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* Currency Selector */}
-              <div className="form-group">
-                <label className="form-label">Salary Currency</label>
+              {/* Resume Curation & JD Alignment Tracker */}
+              <div style={{
+                gridColumn: '1 / -1',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.88rem' }}>
+                    <Sparkles size={16} style={{ color: formData.resumeCuration === 'curated' ? '#10B981' : (formData.resumeCuration === 'pending' ? '#F59E0B' : 'var(--text-secondary)') }} />
+                    <span>Resume Tailoring & JD Alignment</span>
+                  </div>
+                  <span style={{
+                    fontSize: '0.72rem',
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    background: formData.resumeCuration === 'curated' ? 'rgba(16, 185, 129, 0.12)' : (formData.resumeCuration === 'pending' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(100, 116, 139, 0.12)'),
+                    color: formData.resumeCuration === 'curated' ? '#10B981' : (formData.resumeCuration === 'pending' ? '#F59E0B' : 'var(--text-secondary)'),
+                    border: `1px solid ${formData.resumeCuration === 'curated' ? 'rgba(16, 185, 129, 0.3)' : (formData.resumeCuration === 'pending' ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)')}`
+                  }}>
+                    {formData.resumeCuration === 'curated' ? '✨ Tailored for JD' : (formData.resumeCuration === 'pending' ? '⏳ Tailoring Pending' : '📄 Standard Resume')}
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '8px' }}>
+                  {[
+                    { id: 'curated', label: 'Tailored for JD', desc: 'Customized with JD keywords & company focus', color: '#10B981' },
+                    { id: 'pending', label: 'Needs Tailoring', desc: 'Reminder to customize resume before applying', color: '#F59E0B' },
+                    { id: 'not_needed', label: 'Standard / Not Needed', desc: 'General software engineer resume is fine', color: '#64748B' }
+                  ].map(opt => {
+                    const isSelected = (formData.resumeCuration || 'pending') === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => handleChange('resumeCuration', opt.id)}
+                        style={{
+                          background: isSelected ? 'var(--bg-surface-hover)' : 'transparent',
+                          border: isSelected ? `2px solid ${opt.color}` : '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '3px',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <div style={{ fontWeight: 700, fontSize: '0.8rem', color: isSelected ? opt.color : 'var(--text-primary)' }}>
+                          {opt.label}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {opt.desc}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                  <label style={{ fontSize: '0.76rem', color: 'var(--text-secondary)', fontWeight: 600, minWidth: '95px' }}>
+                    Resume File:
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    style={{ height: '32px', fontSize: '0.78rem' }}
+                    placeholder="e.g. Resume_SDE_Zomato_v2.pdf"
+                    value={formData.resumeVersion || ''}
+                    onChange={(e) => handleChange('resumeVersion', e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Undisclosed Salary Checkbox */}
+              <div style={{
+                gridColumn: '1 / -1',
+                background: 'var(--bg-surface-hover)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px'
+              }}>
+                <div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.salaryUndisclosed)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormData(prev => ({
+                          ...prev,
+                          salaryUndisclosed: checked,
+                          salaryMin: checked ? 0 : prev.salaryMin,
+                          salaryMax: checked ? 0 : prev.salaryMax
+                        }));
+                      }}
+                      style={{ accentColor: 'var(--accent-primary)', width: '16px', height: '16px' }}
+                    />
+                    <span>Salary / Stipend Not Disclosed by Company</span>
+                  </label>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginLeft: '24px', marginTop: '2px' }}>
+                    Check this if compensation is not specified in the JD, or leave inputs empty.
+                  </div>
+                </div>
+                {formData.salaryUndisclosed && (
+                  <span className="badge" style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)', fontSize: '0.72rem' }}>
+                    Marked Undisclosed
+                  </span>
+                )}
+              </div>
+
+              {/* Disclosed Salary Inputs */}
+              {!formData.salaryUndisclosed && (
+                <>
+                  {/* Currency Selector */}
+                  <div className="form-group">
+                    <label className="form-label">Salary Currency</label>
                 <select
                   className="form-input"
                   value={formData.currency || 'INR'}
@@ -428,53 +700,53 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                 </div>
               )}
 
-              {/* Min Salary / Stipend */}
-              <div className="form-group">
-                <label className="form-label">
-                  {formData.salaryPeriod === 'monthly'
-                    ? `Min Stipend (${formData.currency === 'INR' ? '₹ / mo' : `${formData.currency || '$'}/mo`})`
-                    : formData.salaryPeriod === 'hourly'
-                    ? `Min Rate (${formData.currency === 'INR' ? '₹ / hr' : `${formData.currency || '$'}/hr`})`
-                    : `Min Salary (${formData.currency === 'INR' ? '₹ Raw / LPA' : `${formData.currency || '$'}/yr`})`}
-                </label>
-                <input
-                  type="number"
-                  className="form-input"
-                  placeholder={
-                    formData.salaryPeriod === 'monthly'
-                      ? (formData.currency === 'INR' ? 'e.g. 40000' : 'e.g. 2000')
-                      : formData.salaryPeriod === 'hourly'
-                      ? (formData.currency === 'INR' ? 'e.g. 800' : 'e.g. 25')
-                      : (formData.currency === 'INR' ? 'e.g. 1800000 (18 LPA)' : 'e.g. 120000')
-                  }
-                  value={formData.salaryMin}
-                  onChange={(e) => handleChange('salaryMin', Number(e.target.value))}
-                />
-              </div>
+                  {/* Min Salary / Stipend */}
+                  <div className="form-group">
+                    <label className="form-label">
+                      {formData.salaryPeriod === 'monthly'
+                        ? `Min Stipend (${formData.currency === 'INR' ? '₹ / mo' : `${formData.currency || '$'}/mo`})`
+                        : formData.salaryPeriod === 'hourly'
+                        ? `Min Rate (${formData.currency === 'INR' ? '₹ / hr' : `${formData.currency || '$'}/hr`})`
+                        : `Min Salary (${formData.currency === 'INR' ? '₹ Raw / LPA' : `${formData.currency || '$'}/yr`})`}
+                    </label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      placeholder={
+                        formData.salaryPeriod === 'monthly'
+                          ? (formData.currency === 'INR' ? 'Optional (e.g. 40000)' : 'Optional (e.g. 2000)')
+                          : formData.salaryPeriod === 'hourly'
+                          ? (formData.currency === 'INR' ? 'Optional (e.g. 800)' : 'Optional (e.g. 25)')
+                          : (formData.currency === 'INR' ? 'Optional (e.g. 1800000)' : 'Optional (e.g. 120000)')
+                      }
+                      value={formData.salaryMin === 0 ? '' : formData.salaryMin}
+                      onChange={(e) => handleChange('salaryMin', e.target.value === '' ? 0 : Number(e.target.value))}
+                    />
+                  </div>
 
-              {/* Max Salary / Stipend */}
-              <div className="form-group">
-                <label className="form-label">
-                  {formData.salaryPeriod === 'monthly'
-                    ? `Max Stipend (${formData.currency === 'INR' ? '₹ / mo' : `${formData.currency || '$'}/mo`})`
-                    : formData.salaryPeriod === 'hourly'
-                    ? `Max Rate (${formData.currency === 'INR' ? '₹ / hr' : `${formData.currency || '$'}/hr`})`
-                    : `Max Salary (${formData.currency === 'INR' ? '₹ Raw / LPA' : `${formData.currency || '$'}/yr`})`}
-                </label>
-                <input
-                  type="number"
-                  className="form-input"
-                  placeholder={
-                    formData.salaryPeriod === 'monthly'
-                      ? (formData.currency === 'INR' ? 'e.g. 60000' : 'e.g. 3500')
-                      : formData.salaryPeriod === 'hourly'
-                      ? (formData.currency === 'INR' ? 'e.g. 1500' : 'e.g. 45')
-                      : (formData.currency === 'INR' ? 'e.g. 2800000 (28 LPA)' : 'e.g. 150000')
-                  }
-                  value={formData.salaryMax}
-                  onChange={(e) => handleChange('salaryMax', Number(e.target.value))}
-                />
-              </div>
+                  {/* Max Salary / Stipend */}
+                  <div className="form-group">
+                    <label className="form-label">
+                      {formData.salaryPeriod === 'monthly'
+                        ? `Max Stipend (${formData.currency === 'INR' ? '₹ / mo' : `${formData.currency || '$'}/mo`})`
+                        : formData.salaryPeriod === 'hourly'
+                        ? `Max Rate (${formData.currency === 'INR' ? '₹ / hr' : `${formData.currency || '$'}/hr`})`
+                        : `Max Salary (${formData.currency === 'INR' ? '₹ Raw / LPA' : `${formData.currency || '$'}/yr`})`}
+                    </label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      placeholder={
+                        formData.salaryPeriod === 'monthly'
+                          ? (formData.currency === 'INR' ? 'Optional (e.g. 60000)' : 'Optional (e.g. 3500)')
+                          : formData.salaryPeriod === 'hourly'
+                          ? (formData.currency === 'INR' ? 'Optional (e.g. 1500)' : 'Optional (e.g. 45)')
+                          : (formData.currency === 'INR' ? 'Optional (e.g. 2800000)' : 'Optional (e.g. 150000)')
+                      }
+                      value={formData.salaryMax === 0 ? '' : formData.salaryMax}
+                      onChange={(e) => handleChange('salaryMax', e.target.value === '' ? 0 : Number(e.target.value))}
+                    />
+                  </div>
 
               {/* Live Conversion Preview Banner */}
               {(formData.salaryMin > 0 || formData.salaryMax > 0) && (() => {
@@ -663,26 +935,59 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                   </div>
                 )}
               </div>
+            </>
+          )}
 
-              {/* Planned Apply Date */}
+              {/* Validation Date Error Banner */}
+              {dateError && (
+                <div style={{
+                  gridColumn: '1 / -1',
+                  background: 'var(--status-rejected-bg)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  color: 'var(--status-rejected)',
+                  padding: '10px 14px',
+                  borderRadius: '8px',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                  <span>{dateError}</span>
+                </div>
+              )}
+
+              {/* Planned Apply Date (Mandatory for Wishlist / Referral) */}
               <div className="form-group">
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Calendar size={13} style={{ color: 'var(--status-wishlist)' }} />
-                  <span>Planned Apply Date</span>
+                  <span>
+                    Planned Apply Date {(formData.status === 'wishlist' || formData.status === 'referral') && <strong style={{ color: 'var(--status-rejected)' }}>*</strong>}
+                  </span>
                 </label>
                 <input
                   type="date"
                   className="form-input"
                   value={formData.plannedApplyDate || ''}
-                  onChange={(e) => handleChange('plannedApplyDate', e.target.value)}
+                  onChange={(e) => {
+                    setDateError('');
+                    handleChange('plannedApplyDate', e.target.value);
+                  }}
+                  required={formData.status === 'wishlist' || formData.status === 'referral'}
                 />
+                <span style={{ fontSize: '0.7rem', color: (formData.status === 'wishlist' || formData.status === 'referral') ? 'var(--status-wishlist)' : 'var(--text-muted)' }}>
+                  {(formData.status === 'wishlist' || formData.status === 'referral')
+                    ? '⚠️ Mandatory for tracking application roadmap'
+                    : 'Optional target apply date'}
+                </span>
               </div>
 
-              {/* Application Deadline */}
+              {/* Application Deadline (Always Optional) */}
               <div className="form-group">
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Clock size={13} style={{ color: 'var(--status-rejected)' }} />
-                  <span>Application Deadline</span>
+                  <span>Application Deadline <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>(Optional)</span></span>
                   {formData.deadline && (
                     <span style={{ fontSize: '0.7rem', color: 'var(--status-rejected)', marginLeft: 'auto', fontWeight: 600 }}>
                       ⚠️ Active Alert
@@ -695,20 +1000,34 @@ export default function JobModal({ isOpen, onClose, onSave, application, initial
                   value={formData.deadline || ''}
                   onChange={(e) => handleChange('deadline', e.target.value)}
                 />
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  Leave blank if rolling admissions or not specified in JD
+                </span>
               </div>
 
-              {/* Actual Applied Date */}
+              {/* Actual Applied Date (Mandatory for Applied / Interviewing / Offer / Rejected) */}
               <div className="form-group">
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <CheckCircle2 size={13} style={{ color: 'var(--status-applied)' }} />
-                  <span>Actual Applied Date</span>
+                  <span>
+                    Actual Applied Date {formData.status !== 'wishlist' && formData.status !== 'referral' && <strong style={{ color: 'var(--status-rejected)' }}>*</strong>}
+                  </span>
                 </label>
                 <input
                   type="date"
                   className="form-input"
                   value={formData.appliedDate || ''}
-                  onChange={(e) => handleChange('appliedDate', e.target.value)}
+                  onChange={(e) => {
+                    setDateError('');
+                    handleChange('appliedDate', e.target.value);
+                  }}
+                  required={formData.status !== 'wishlist' && formData.status !== 'referral'}
                 />
+                <span style={{ fontSize: '0.7rem', color: formData.status !== 'wishlist' && formData.status !== 'referral' ? 'var(--status-applied)' : 'var(--text-muted)' }}>
+                  {formData.status !== 'wishlist' && formData.status !== 'referral'
+                    ? '⚠️ Mandatory date when you submitted application'
+                    : 'Optional — leave blank until submitted'}
+                </span>
               </div>
 
               <div className="form-group" style={{ gridColumn: '1 / -1' }}>

@@ -76,6 +76,7 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
   const criticalCount = pendingJobs.filter(j => j.urgencyLevel === 'critical').length;
   const highCount = pendingJobs.filter(j => j.urgencyLevel === 'high').length;
   const referralCount = pendingJobs.filter(j => j.status === 'referral' || j.referralStatus === 'connection_pending').length;
+  const needsTailoringCount = pendingJobs.filter(j => j.resumeCuration === 'pending').length;
 
   const isUrgent = criticalCount > 0 || highCount > 0;
 
@@ -148,6 +149,11 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
               {referralCount > 0 && (
                 <span style={{ color: 'var(--status-referral)', fontWeight: 700 }}>
                   🤝 {referralCount} waiting for LinkedIn connection / referral
+                </span>
+              )}
+              {needsTailoringCount > 0 && (
+                <span style={{ color: '#F59E0B', fontWeight: 700 }}>
+                  📝 {needsTailoringCount} pending resume tailoring for JD
                 </span>
               )}
               <span style={{ color: 'var(--text-secondary)' }}>Review and submit your applications before opportunities close!</span>
@@ -287,6 +293,27 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
                     <span>Plan to apply: {job.plannedApplyDate}</span>
                   </div>
                 ) : null}
+
+                {/* Resume Tailoring Reminder */}
+                {job.resumeCuration === 'pending' && (
+                  <div
+                    style={{
+                      background: 'rgba(245, 158, 11, 0.12)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      color: '#F59E0B',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <span>⏳</span>
+                    <span>Reminder: Tailor resume specifically to this JD</span>
+                  </div>
+                )}
 
                 {/* Referral Details if any */}
                 {(job.status === 'referral' || job.referralStatus === 'connection_pending') && (

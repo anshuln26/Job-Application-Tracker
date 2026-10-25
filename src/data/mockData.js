@@ -72,6 +72,12 @@ export const PRIORITIES = [
   { id: 'low', label: 'Low Priority', color: 'var(--priority-low)', bg: 'var(--priority-low-bg)' },
 ];
 
+export const RESUME_CURATION_STATUSES = [
+  { id: 'curated', label: 'Tailored for JD', shortLabel: 'Tailored', badge: '✨ Tailored', color: '#10B981', bg: 'rgba(16, 185, 129, 0.12)', border: 'rgba(16, 185, 129, 0.3)' },
+  { id: 'pending', label: 'Needs Tailoring', shortLabel: 'Pending', badge: '⏳ Needs Tailoring', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.3)' },
+  { id: 'not_needed', label: 'Standard / Not Needed', shortLabel: 'Standard', badge: '📄 Standard', color: '#64748B', bg: 'rgba(100, 116, 139, 0.12)', border: 'rgba(100, 116, 139, 0.25)' }
+];
+
 export const INITIAL_APPLICATIONS = [
   {
     id: 'job-1',
@@ -84,6 +90,8 @@ export const INITIAL_APPLICATIONS = [
     salaryMin: 165000,
     salaryMax: 195000,
     currency: 'USD',
+    salaryUndisclosed: false,
+    resumeCuration: 'curated',
     appliedDate: '2026-09-10',
     jobUrl: 'https://stripe.com/jobs/frontend-dev',
     contactName: 'Sarah Lin',

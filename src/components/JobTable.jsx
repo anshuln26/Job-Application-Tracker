@@ -294,6 +294,38 @@ export default function JobTable({
                             <Users size={10} /> Referral Pending
                           </span>
                         )}
+                        {app.resumeCuration === 'pending' && (
+                          <span style={{
+                            background: 'rgba(245, 158, 11, 0.14)',
+                            color: '#F59E0B',
+                            border: '1px solid rgba(245, 158, 11, 0.35)',
+                            fontSize: '0.68rem',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }} title="Reminder: Tailor resume specifically to this JD before applying">
+                            ⏳ Needs Resume Tailoring
+                          </span>
+                        )}
+                        {app.resumeCuration === 'curated' && (
+                          <span style={{
+                            background: 'rgba(16, 185, 129, 0.12)',
+                            color: '#10B981',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            fontSize: '0.68rem',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontWeight: 600,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }} title="Resume is tailored specifically for this JD">
+                            ✨ Tailored
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{app.title}</div>
                     </td>
@@ -390,9 +422,11 @@ export default function JobTable({
                         </div>
                       )}
                     </td>
-                    <td style={{ padding: '12px', fontWeight: 600, color: app.salaryMax ? 'var(--status-offer)' : 'var(--text-muted)' }}>
+                    <td style={{ padding: '12px', fontWeight: 600, color: (!app.salaryUndisclosed && app.salaryMax) ? 'var(--status-offer)' : 'var(--text-muted)' }}>
                       {(() => {
-                        if (!app.salaryMax) return 'N/A';
+                        if (app.salaryUndisclosed || (!app.salaryMax && !app.salaryMin)) {
+                          return <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>Undisclosed</span>;
+                        }
                         const period = app.salaryPeriod || ((app.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
                         const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency, period, app.hoursPerWeek || 40);
                         return (
@@ -414,9 +448,6 @@ export default function JobTable({
                           </div>
                         );
                       })()}
-                    </td>
-                    <td style={{ padding: '12px', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-                      {app.appliedDate || 'Not applied'}
                     </td>
                     <td style={{ padding: '12px', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                       <div style={{ display: 'inline-flex', gap: '4px' }}>

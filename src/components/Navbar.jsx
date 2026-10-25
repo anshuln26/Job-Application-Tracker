@@ -230,18 +230,30 @@ export default function Navbar({
 
           {/* Supabase Cloud Connection & Auth Status */}
           {user ? (
-            <button
-              className="btn btn-secondary"
-              onClick={onSignOut}
-              title={`Connected to Supabase as ${user.email}. Click to sign out.`}
-              style={{ height: '40px', gap: '8px', fontSize: '0.825rem' }}
-            >
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--status-offer)' }} />
-              <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user.email.split('@')[0]}
-              </span>
-              <LogOut size={14} style={{ color: 'var(--text-muted)' }} />
-            </button>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={onOpenAuthModal}
+                title={`Logged in as ${user.email}. Click to view account & database settings.`}
+                style={{ height: '40px', gap: '8px', fontSize: '0.825rem', borderTopRightRadius: '4px', borderBottomRightRadius: '4px' }}
+              >
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--status-offer)' }} />
+                <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {user.email ? user.email.split('@')[0] : 'User'}
+                </span>
+              </button>
+              <button
+                className="btn btn-secondary btn-icon"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSignOut();
+                }}
+                title="Sign out of personal vault"
+                style={{ height: '40px', width: '34px', borderTopLeftRadius: '4px', borderBottomLeftRadius: '4px', color: 'var(--text-muted)' }}
+              >
+                <LogOut size={13} />
+              </button>
+            </div>
           ) : (
             <button
               className="btn btn-secondary"

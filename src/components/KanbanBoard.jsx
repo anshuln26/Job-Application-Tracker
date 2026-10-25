@@ -226,33 +226,64 @@ export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus,
 
                       {/* Salary & Work Type */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '10px', fontSize: '0.75rem' }}>
-                        {app.salaryMax > 0 && (() => {
-                          const period = app.salaryPeriod || ((app.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
-                          const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency, period, app.hoursPerWeek || 40);
-                          return (
-                            <span
-                              style={{
-                                color: period === 'monthly' ? '#EC4899' : 'var(--status-offer)',
-                                fontWeight: 700,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                background: period === 'monthly' ? 'rgba(236, 72, 153, 0.1)' : 'rgba(16, 185, 129, 0.08)',
-                                padding: '2px 7px',
-                                borderRadius: '6px'
-                              }}
-                              title={sal.isConverted ? `Original: ${sal.original} (Converted at current rates)` : `Stated in ${sal.targetCurrency}`}
-                            >
-                              {period === 'monthly' && <span style={{ fontSize: '0.72rem' }}>🎓</span>}
-                              <span>{sal.formatted}</span>
-                              {sal.isConverted && (
-                                <span style={{ fontSize: '0.67rem', opacity: 0.75, fontWeight: 500 }}>
-                                  ({sal.original})
-                                </span>
-                              )}
-                            </span>
-                          );
-                        })()}
+                        {app.salaryUndisclosed ? (
+                          <span
+                            style={{
+                              color: 'var(--text-muted)',
+                              background: 'var(--bg-surface-hover)',
+                              border: '1px solid var(--border-color)',
+                              padding: '2px 7px',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontStyle: 'italic'
+                            }}
+                            title="Income / stipend not disclosed for this position"
+                          >
+                            Undisclosed
+                          </span>
+                        ) : app.salaryMax > 0 ? (
+                          (() => {
+                            const period = app.salaryPeriod || ((app.title || '').toLowerCase().includes('intern') ? 'monthly' : 'yearly');
+                            const sal = formatSalaryRange(app.salaryMin, app.salaryMax, app.currency, displayCurrency, period, app.hoursPerWeek || 40);
+                            return (
+                              <span
+                                style={{
+                                  color: period === 'monthly' ? '#EC4899' : 'var(--status-offer)',
+                                  fontWeight: 700,
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: period === 'monthly' ? 'rgba(236, 72, 153, 0.1)' : 'rgba(16, 185, 129, 0.08)',
+                                  padding: '2px 7px',
+                                  borderRadius: '6px'
+                                }}
+                                title={sal.isConverted ? `Original: ${sal.original} (Converted at current rates)` : `Stated in ${sal.targetCurrency}`}
+                              >
+                                {period === 'monthly' && <span style={{ fontSize: '0.72rem' }}>🎓</span>}
+                                <span>{sal.formatted}</span>
+                                {sal.isConverted && (
+                                  <span style={{ fontSize: '0.67rem', opacity: 0.75, fontWeight: 500 }}>
+                                    ({sal.original})
+                                  </span>
+                                )}
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <span
+                            style={{
+                              color: 'var(--text-muted)',
+                              background: 'var(--bg-surface-hover)',
+                              border: '1px solid var(--border-color)',
+                              padding: '2px 7px',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontStyle: 'italic'
+                            }}
+                          >
+                            Undisclosed
+                          </span>
+                        )}
                         <span style={{
                           background: 'var(--bg-glass)',
                           border: '1px solid var(--border-color)',
@@ -263,6 +294,48 @@ export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus,
                           {app.workType}
                         </span>
                       </div>
+
+                      {/* Resume Curation / JD Tailoring Badge */}
+                      {app.resumeCuration === 'pending' && (
+                        <div style={{
+                          background: 'rgba(245, 158, 11, 0.12)',
+                          border: '1px solid rgba(245, 158, 11, 0.35)',
+                          color: '#F59E0B',
+                          borderRadius: '6px',
+                          padding: '3px 8px',
+                          fontSize: '0.72rem',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                          marginBottom: '8px'
+                        }} title="Reminder: Tailor resume specifically to this JD before submitting">
+                          <span>⏳</span>
+                          <span>Needs Resume Tailoring for JD</span>
+                        </div>
+                      )}
+
+                      {app.resumeCuration === 'curated' && (
+                        <div style={{
+                          background: 'rgba(16, 185, 129, 0.10)',
+                          border: '1px solid rgba(16, 185, 129, 0.25)',
+                          color: '#10B981',
+                          borderRadius: '6px',
+                          padding: '2px 7px',
+                          fontSize: '0.70rem',
+                          fontWeight: 600,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          marginBottom: '8px'
+                        }} title="Resume is tailored specifically for this JD">
+                          <span>✨</span>
+                          <span>Resume Tailored to JD</span>
+                          {app.resumeVersion && (
+                            <span style={{ opacity: 0.8, fontWeight: 400 }}>({app.resumeVersion})</span>
+                          )}
+                        </div>
+                      )}
 
                       {/* Global Preferences Badges: Visa, Shift, Notice */}
                       {((app.visaStatus && app.visaStatus !== 'none') || (app.timezoneShift && app.timezoneShift !== 'none') || (app.noticePeriod && app.noticePeriod !== 'none')) && (

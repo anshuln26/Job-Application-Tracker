@@ -56,9 +56,35 @@ A modern, cloud-synced career management platform designed for global software e
 
 ---
 
-### 🚨 4. Smart Action Center & Urgent Attention Banner
-- **Approaching Deadlines**: Dynamic countdown alerts (`🚨 Deadline Today`, `⚠️ Deadline in 3 days`, `Expired`).
+### 📄 4. Resume Curation & JD Alignment Tracker
+- **Targeted Resume Alignment**: In competitive markets, applicants tailor their resume for each Job Description and company.
+- **3 Curation States**:
+  - `✨ Tailored for this JD`: Resume customized with keywords and experience matching the specific posting.
+  - `⏳ Needs Tailoring (Reminder)`: Triggers automatic amber warning badges across the Kanban board, Table view, and Urgency Banner reminding you to tailor before submitting.
+  - `📄 Standard / Not Needed`: Standard generalized master resume.
+- **Specific Resume Version Tracking**: Record exact file version uploaded (e.g., `Fullstack_React_2026.pdf`, `DataEng_AWS.pdf`).
+
+---
+
+### 💰 5. Undisclosed & Optional Salary Mode
+- **Optional Compensation**: Putting stipend or annual income is strictly non-mandatory.
+- **"Salary Not Disclosed by Company" Toggle**: Instantly marks the position as undisclosed and displays elegant neutral badges across cards and tables.
+- **Clean Fallback**: Blank inputs default safely without skewing analytics or conversion calculations.
+
+---
+
+### 📍 6. Intelligent Location Recommendations
+- **Auto-Learning Location Presets**: Adding custom locations (e.g., `South Korea`, `Tokyo, Japan`, `Berlin, Germany`, `Chennai, India`, `Dublin, Ireland`) automatically saves them to personal recommendations.
+- **Quick-Fill Pills**: One-click pills allow instant selection when adding subsequent applications.
+- **Recommendation Manager**: Add with 1-click or remove unused presets anytime.
+
+---
+
+### 🚨 7. Smart Action Center & Urgent Attention Banner
+- **Approaching Deadlines**: Dynamic countdown alerts (`🚨 Deadline Today`, `⚠️ Deadline in 3 days`, `Expired`). Deadlines can also be left blank for rolling admissions.
 - **Pending Submissions**: Highlights jobs saved in *Wishlist* or *Waiting for Referral* to prevent missed application windows.
+- **Planned vs. Actual Dates**: Enforces planned apply date for wishlist/referral, and actual applied date for submitted positions.
+- **Resume Tailoring Alert**: Banner directly displays the count of applications waiting for resume customization.
 - **Quick Action Triggers**: Mark as applied directly from the urgency banner with one click.
 
 ---
