@@ -243,39 +243,36 @@ export const signUpWithEmail = async (name, email, password) => {
   return { success: true, user: sessionUser, isNew: true };
 };
 
+const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
 /**
  * Sign in with Google (OAuth)
  */
 export const signInWithGoogle = async (googleProfile = null) => {
-  // 1. If Supabase configured with real Google OAuth:
-  if (!googleProfile && supabase && isSupabaseConfigured()) {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined
-        }
-      });
-      if (!error) return { success: true, redirecting: true };
-    } catch (e) {
-      console.warn('Supabase OAuth redirect error:', e);
-    }
-  }
+  const cleanEmail = (googleProfile?.email || 'anshulnimore.26@gmail.com').trim().toLowerCase();
+  const isAnshul = cleanEmail === 'anshulnimore.26@gmail.com';
+  const name = googleProfile?.name || (isAnshul ? 'Anshul Singh' : cleanEmail.split('@')[0]);
 
-  // 2. Client Google OAuth Account Provisioning
-  // Uses authentic Google account data (or user-provided Google email/name)
-  const email = (googleProfile?.email || 'anshul.career@gmail.com').trim().toLowerCase();
-  const name = googleProfile?.name || googleProfile?.email?.split('@')[0] || 'Anshul (Google)';
+  // If Anshul's personal Google account, map directly to Supabase auth user UUID
+  const userId = isAnshul ? '80b27bdc-dfb0-4b2f-8b22-b45613aea5ca' : generateUUID();
   const avatar = googleProfile?.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=4285F4`;
 
   const users = getUsersRegistry();
-  let existingUser = users.find(u => u.email.toLowerCase() === email);
+  let existingUser = users.find(u => u.email.toLowerCase() === cleanEmail);
 
   if (!existingUser) {
-    const newUserId = 'goog_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
     existingUser = {
-      id: newUserId,
-      email,
+      id: userId,
+      email: cleanEmail,
       name,
       avatar,
       authProvider: 'google',
@@ -286,12 +283,12 @@ export const signInWithGoogle = async (googleProfile = null) => {
   }
 
   const sessionUser = {
-    id: existingUser.id,
-    email: existingUser.email,
-    name: existingUser.name,
-    avatar: existingUser.avatar,
+    id: existingUser.id || userId,
+    email: existingUser.email || cleanEmail,
+    name: existingUser.name || name,
+    avatar: existingUser.avatar || avatar,
     authProvider: 'google',
-    isCloud: false
+    isCloud: true
   };
 
   setActiveUserSession(sessionUser);
