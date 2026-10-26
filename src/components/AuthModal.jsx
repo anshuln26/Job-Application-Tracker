@@ -36,7 +36,8 @@ export default function AuthModal({
   onSignOut,
   applicationsCount = 0,
   isGate = false,
-  isRecoveryMode = false
+  isRecoveryMode = false,
+  onContinueAsGuest
 }) {
   // Mode: 'login' | 'signup' | 'verify_signup' | 'forgot_password' | 'email_link_sent' | 'reset_password_otp' | 'recovery_set_password' | 'google_setup_help'
   const [mode, setMode] = useState(isRecoveryMode ? 'recovery_set_password' : 'login');
@@ -378,8 +379,8 @@ export default function AuthModal({
     }
   };
 
-  // Profile Dialog for already logged-in user
-  if (user && !isGate && !isRecoveryMode) {
+  // Profile Dialog for already logged-in user (not guest)
+  if (user && !user.isGuest && !isGate && !isRecoveryMode) {
     return (
       <div
         style={{
@@ -804,6 +805,40 @@ export default function AuthModal({
                 Sign up
               </button>
             </div>
+
+            {onContinueAsGuest && (
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={onContinueAsGuest}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 14px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.825rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderRadius: '8px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = 'var(--text-primary)';
+                    e.currentTarget.style.background = 'var(--bg-surface-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.background = 'none';
+                  }}
+                >
+                  <User size={14} />
+                  <span>Continue as Guest (No account needed) &rarr;</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -973,6 +1008,40 @@ export default function AuthModal({
                 Log in
               </button>
             </div>
+
+            {onContinueAsGuest && (
+              <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', textAlign: 'center' }}>
+                <button
+                  type="button"
+                  onClick={onContinueAsGuest}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '8px 14px',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.825rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    borderRadius: '8px',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = 'var(--text-primary)';
+                    e.currentTarget.style.background = 'var(--bg-surface-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                    e.currentTarget.style.background = 'none';
+                  }}
+                >
+                  <User size={14} />
+                  <span>Continue as Guest (No account needed) &rarr;</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 

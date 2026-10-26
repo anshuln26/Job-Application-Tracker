@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { AlertCircle, LogIn } from 'lucide-react';
 import Navbar from './components/Navbar';
 import StatsOverview from './components/StatsOverview';
 import KanbanBoard from './components/KanbanBoard';
@@ -17,7 +18,6 @@ import { INITIAL_APPLICATIONS } from './data/mockData';
 import { supabase } from './lib/supabaseClient';
 import { getActiveUser, setActiveUserSession, signOutUser, onAuthStateChange } from './lib/authService';
 
-const LOCAL_STORAGE_KEY = 'careertrack_apps_v1';
 const THEME_KEY = 'careertrack_theme_v1';
 
 const META_TAG_START = '<!-- CT_META:';
@@ -176,15 +176,23 @@ const mapFromDb = (item) => {
   };
 };
 
+const GUEST_USER = {
+  id: 'guest',
+  name: 'Guest User',
+  email: '',
+  isGuest: true,
+  avatar: null
+};
+
 const getUserStorageKey = (u) => {
-  if (u?.email) return `careertrack_apps_${u.email.toLowerCase().trim()}`;
-  if (u?.id) return `careertrack_apps_${u.id}`;
-  return 'careertrack_apps_guest';
+  if (u && !u.isGuest && u.email) return `careertrack_apps_${u.email.toLowerCase().trim()}`;
+  if (u && !u.isGuest && u.id) return `careertrack_apps_${u.id}`;
+  return 'careertrack_apps_guest_temp';
 };
 
 export default function App() {
   // User Auth State
-  const [user, setUser] = useState(() => getActiveUser());
+  const [user, setUser] = useState(() => getActiveUser() || GUEST_USER);
   const prevUserRef = useRef(user);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
@@ -201,7 +209,9 @@ export default function App() {
   const [applications, setApplications] = useState(() => {
     try {
       const active = getActiveUser();
-      if (!active) return [];
+      if (!active || active.isGuest) {
+        return INITIAL_APPLICATIONS;
+      }
       const userKey = getUserStorageKey(active);
       const saved = localStorage.getItem(userKey);
       if (saved) return JSON.parse(saved);
@@ -278,8 +288,8 @@ export default function App() {
           }
         } else if (event === 'SIGNED_OUT') {
           setActiveUserSession(null);
-          setUser(null);
-          setApplications([]);
+          setUser(GUEST_USER);
+          setApplications(INITIAL_APPLICATIONS);
         }
       });
 
@@ -317,16 +327,23 @@ export default function App() {
   const handleSignOut = async () => {
     await signOutUser();
     setActiveUserSession(null);
-    setUser(null);
-    setApplications([]);
+    setUser(GUEST_USER);
+    setApplications(INITIAL_APPLICATIONS);
     setIsAuthModalOpen(false);
-    showToast('Signed out of your account.');
+    showToast('Signed out. You are now in Guest Mode.', 'info');
+  };
+
+  const handleContinueAsGuest = () => {
+    setUser(GUEST_USER);
+    setApplications(INITIAL_APPLICATIONS);
+    setIsAuthModalOpen(false);
+    showToast('Browsing as Guest. Changes will NOT be saved to the cloud.', 'warning');
   };
 
   // When user signs in, changes, or signs out, switch to their personal isolated vault
   useEffect(() => {
     let isMounted = true;
-    if (!user) return;
+    if (!user || user.isGuest) return;
 
     const userEmail = (user.email || '').toLowerCase().trim();
     const userKey = getUserStorageKey(user);
@@ -420,7 +437,7 @@ export default function App() {
 
   // Sync LocalStorage whenever applications change for active user
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.isGuest) return;
     if (prevUserRef.current?.email !== user.email) {
       prevUserRef.current = user;
       return;
@@ -465,15 +482,23 @@ export default function App() {
     setApplications(prev => {
       const exists = prev.some(a => a.id === appData.id);
       if (exists) {
-        showToast(`Updated application for ${appData.company}`);
+        showToast(
+          user?.isGuest
+            ? `Updated ${appData.company} (Guest Mode - Not saved to cloud)`
+            : `Updated application for ${appData.company}`
+        );
         return prev.map(a => a.id === appData.id ? appData : a);
       } else {
-        showToast(`Added application for ${appData.company}`);
+        showToast(
+          user?.isGuest
+            ? `Added ${appData.company} (Guest Mode - Not saved to cloud)`
+            : `Added application for ${appData.company}`
+        );
         return [appData, ...prev];
       }
     });
 
-    if (user && supabase) {
+    if (user && !user.isGuest && supabase) {
       try {
         const { error } = await supabase.from('applications').upsert(mapToDb(appData, user));
         if (error) throw error;
@@ -502,7 +527,7 @@ export default function App() {
     }));
     showToast(`Status updated!`);
 
-    if (user && supabase) {
+    if (user && !user.isGuest && supabase) {
       try {
         await supabase
           .from('applications')
@@ -544,7 +569,7 @@ export default function App() {
     setApplications(prev => prev.map(a => ids.includes(a.id) ? { ...a, status: newStatus } : a));
     showToast(`Updated status for ${ids.length} applications.`);
 
-    if (user && supabase) {
+    if (user && !user.isGuest && supabase) {
       try {
         await supabase.from('applications').update({ status: newStatus }).in('id', ids);
       } catch (err) {
@@ -568,7 +593,7 @@ export default function App() {
     });
     showToast('Application restored back to board!');
 
-    if (user && supabase && restoredApp) {
+    if (user && !user.isGuest && supabase && restoredApp) {
       try {
         await supabase.from('applications').upsert(mapToDb(restoredApp, user));
       } catch (err) {
@@ -582,7 +607,7 @@ export default function App() {
     setApplications(prev => prev.map(a => a.archived ? { ...a, archived: false, archivedAt: null } : a));
     showToast('All archived applications restored back to active board!');
 
-    if (user && supabase) {
+    if (user && !user.isGuest && supabase) {
       try {
         const rows = applications.filter(a => a.archived).map(a => mapToDb({ ...a, archived: false, archivedAt: null }, user));
         if (rows.length > 0) {
@@ -608,7 +633,7 @@ export default function App() {
       }));
       showToast('Application moved to Archive.');
 
-      if (user && supabase && targetArchived) {
+      if (user && !user.isGuest && supabase && targetArchived) {
         try {
           await supabase.from('applications').upsert(mapToDb(targetArchived, user));
         } catch (err) {
@@ -620,7 +645,7 @@ export default function App() {
       setApplications(prev => prev.map(a => ids.includes(a.id) ? { ...a, archived: true, archivedAt: now } : a));
       showToast(`${ids.length} applications moved to Archive.`);
 
-      if (user && supabase) {
+      if (user && !user.isGuest && supabase) {
         try {
           const rows = applications.filter(a => ids.includes(a.id)).map(a => mapToDb({ ...a, archived: true, archivedAt: now }, user));
           await supabase.from('applications').upsert(rows);
@@ -630,8 +655,9 @@ export default function App() {
       }
     } else if (confirmState.type === 'reset') {
       setApplications(INITIAL_APPLICATIONS);
-      localStorage.removeItem(getUserStorageKey(user));
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      if (user && !user.isGuest) {
+        localStorage.removeItem(getUserStorageKey(user));
+      }
       showToast('Reset sample data to initial state.', 'info');
     }
     setConfirmState({ isOpen: false, type: '', id: null, title: '', message: '' });
@@ -693,7 +719,7 @@ export default function App() {
     }));
     showToast('Interview schedule updated!');
 
-    if (user && supabase) {
+    if (user && !user.isGuest && supabase) {
       try {
         await supabase.from('applications').update({ interviews: updatedInterviews }).eq('id', appId);
       } catch (err) {
@@ -713,7 +739,7 @@ export default function App() {
     }));
     showToast('Interview added to schedule!');
 
-    if (user && supabase) {
+    if (user && !user.isGuest && supabase) {
       try {
         await supabase.from('applications').update({ interviews: updatedInterviews }).eq('id', appId);
       } catch (err) {
@@ -733,15 +759,16 @@ export default function App() {
     setIsModalOpen(true);
   };
 
-  // If user is not authenticated OR in recovery mode, render the dedicated Authentication Gate (No Guest Access)
-  if (!user || isRecoveryMode) {
+  // If in recovery mode, render the dedicated Password Reset Gate
+  if (isRecoveryMode) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
         <AuthModal
           isGate={true}
           isOpen={true}
-          isRecoveryMode={isRecoveryMode}
+          isRecoveryMode={true}
           onClose={() => setIsRecoveryMode(false)}
+          onContinueAsGuest={handleContinueAsGuest}
           onAuthSuccess={(loggedInUser) => {
             setUser(loggedInUser);
             setIsRecoveryMode(false);
@@ -781,6 +808,78 @@ export default function App() {
         displayCurrency={displayCurrency}
         setDisplayCurrency={setDisplayCurrency}
       />
+
+      {/* Guest Mode Warning Banner */}
+      {user?.isGuest && (
+        <div
+          className="animate-fade-in"
+          style={{
+            background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.12), rgba(239, 68, 68, 0.12))',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            borderRadius: 'var(--radius-md)',
+            padding: '14px 20px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.05)'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                background: 'rgba(245, 158, 11, 0.2)',
+                color: '#F59E0B',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}
+            >
+              <AlertCircle size={20} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#F59E0B', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                Guest Mode — Data Will Not Be Saved
+                <span
+                  className="badge"
+                  style={{
+                    background: 'rgba(245, 158, 11, 0.25)',
+                    color: '#F59E0B',
+                    fontSize: '0.7rem',
+                    padding: '2px 8px'
+                  }}
+                >
+                  Unsaved Session
+                </span>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
+                You are browsing without an account. Any job applications, edits, or changes made in this session are temporary and will NOT be saved to the cloud.
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => setIsAuthModalOpen(true)}
+              style={{
+                fontSize: '0.825rem',
+                fontWeight: 600,
+                padding: '8px 16px',
+                gap: '6px'
+              }}
+            >
+              <LogIn size={15} />
+              Sign In to Save Data
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main KPI Stats Bar */}
       <StatsOverview
@@ -879,6 +978,7 @@ export default function App() {
           setIsAuthModalOpen(false);
           setIsRecoveryMode(false);
         }}
+        onContinueAsGuest={handleContinueAsGuest}
         onAuthSuccess={(loggedInUser) => {
           setUser(loggedInUser);
           setIsRecoveryMode(false);

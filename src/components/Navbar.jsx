@@ -255,7 +255,7 @@ export default function Navbar({
           )}
 
           {/* User Profile & Auth Status */}
-          {user ? (
+          {user && !user.isGuest ? (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
               <button
                 className="btn btn-secondary"
@@ -289,15 +289,31 @@ export default function Navbar({
               </button>
             </div>
           ) : (
-            <button
-              className="btn btn-secondary"
-              onClick={onOpenAuthModal}
-              title="Sign in or create a personal account"
-              style={{ height: '40px', gap: '6px', fontSize: '0.825rem', fontWeight: 600 }}
-            >
-              <LogIn size={15} />
-              <span>Sign In</span>
-            </button>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <span
+                className="badge"
+                style={{
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  color: '#F59E0B',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  fontSize: '0.72rem',
+                  padding: '4px 8px',
+                  fontWeight: 600
+                }}
+                title="Browsing in Guest Mode (Data is not saved)"
+              >
+                Guest
+              </span>
+              <button
+                className="btn btn-primary"
+                onClick={onOpenAuthModal}
+                title="Sign in or create an account to save data"
+                style={{ height: '40px', gap: '6px', fontSize: '0.825rem', fontWeight: 600 }}
+              >
+                <LogIn size={15} />
+                <span>Sign In</span>
+              </button>
+            </div>
           )}
 
           <button
