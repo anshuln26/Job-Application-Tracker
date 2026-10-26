@@ -799,7 +799,6 @@ export default function App() {
         onExportData={handleExportData}
         onImportData={handleImportData}
         onResetData={handleResetData}
-        totalApps={activeApplications.length}
         user={user}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onSignOut={handleSignOut}
@@ -807,6 +806,8 @@ export default function App() {
         onOpenArchiveModal={() => setIsArchiveModalOpen(true)}
         displayCurrency={displayCurrency}
         setDisplayCurrency={setDisplayCurrency}
+        allApplications={applications}
+        onSelectApp={handleOpenEditModal}
       />
 
       {/* Guest Mode Warning Banner */}

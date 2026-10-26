@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Briefcase,
   LayoutGrid,
@@ -15,8 +15,18 @@ import {
   Scale,
   Archive,
   LogIn,
-  LogOut
+  LogOut,
+  X
 } from 'lucide-react';
+
+const STAGE_LABELS = {
+  wishlist: { label: 'Wishlist', color: '#8B5CF6', bg: 'rgba(139, 92, 246, 0.15)' },
+  referral: { label: 'Waiting for Referral', color: '#EC4899', bg: 'rgba(236, 72, 153, 0.15)' },
+  applied: { label: 'Applied', color: '#3B82F6', bg: 'rgba(59, 130, 246, 0.15)' },
+  interviewing: { label: 'Interviewing', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.15)' },
+  offer: { label: 'Offer Received', color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)' },
+  rejected: { label: 'Rejected', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.15)' }
+};
 
 export default function Navbar({
   activeView,
@@ -29,16 +39,45 @@ export default function Navbar({
   onExportData,
   onImportData,
   onResetData,
-  totalApps,
   user,
   onOpenAuthModal,
   onSignOut,
   archivedCount = 0,
   onOpenArchiveModal,
   displayCurrency = 'INR',
-  setDisplayCurrency
+  setDisplayCurrency,
+  allApplications = [],
+  onSelectApp
 }) {
   const fileInputRef = useRef(null);
+  const searchContainerRef = useRef(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+  // Close search dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Compute live search matches across both active and archived applications
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.toLowerCase().trim();
+    return allApplications.filter(app => {
+      const company = (app.company || '').toLowerCase();
+      const title = (app.title || '').toLowerCase();
+      const location = (app.location || '').toLowerCase();
+      const status = (app.status || '').toLowerCase();
+      const tags = (app.tags || []).join(' ').toLowerCase();
+      const notes = (app.notes || '').toLowerCase();
+      return company.includes(q) || title.includes(q) || location.includes(q) || status.includes(q) || tags.includes(q) || notes.includes(q);
+    }).slice(0, 8);
+  }, [allApplications, searchQuery]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -52,7 +91,7 @@ export default function Navbar({
     <header className="glass-panel" style={{ borderRadius: '0 0 var(--radius-lg) var(--radius-lg)', marginBottom: '24px', padding: '16px 28px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
         
-        {/* Brand & Logo */}
+        {/* Brand & Logo (without redundant badge) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <div style={{
             width: '42px',
@@ -68,25 +107,181 @@ export default function Navbar({
             <Briefcase size={22} />
           </div>
           <div>
-            <h1 style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 style={{ fontSize: '1.25rem', fontWeight: 800, letterSpacing: '-0.02em', margin: 0, color: 'var(--text-primary)' }}>
               CareerTrack Pro
-              <span className="badge badge-applied" style={{ fontSize: '0.7rem', padding: '2px 8px' }}>{totalApps} Apps</span>
             </h1>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Smart Job Search & Offer Tracker</p>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>Smart Job Search & Offer Tracker</p>
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div style={{ flex: '1', maxWidth: '360px', minWidth: '220px', position: 'relative' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        {/* Live Search Bar with Dropdown */}
+        <div ref={searchContainerRef} style={{ flex: '1', maxWidth: '380px', minWidth: '240px', position: 'relative' }}>
+          <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }} />
           <input
             type="text"
             className="form-input"
             placeholder="Search company, title, tag, or notes..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '36px', height: '40px', fontSize: '0.85rem' }}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setIsSearchFocused(true);
+            }}
+            onFocus={() => setIsSearchFocused(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setIsSearchFocused(false);
+            }}
+            style={{ paddingLeft: '36px', paddingRight: searchQuery ? '36px' : '12px', height: '40px', fontSize: '0.85rem' }}
           />
+
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery('');
+                setIsSearchFocused(false);
+              }}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                padding: '4px',
+                color: 'var(--text-muted)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '50%'
+              }}
+              title="Clear search"
+            >
+              <X size={14} />
+            </button>
+          )}
+
+          {/* Interactive Search Dropdown Menu */}
+          {isSearchFocused && searchQuery.trim().length > 0 && (
+            <div
+              className="animate-fade-in"
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                left: 0,
+                right: 0,
+                minWidth: '340px',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '12px',
+                boxShadow: '0 20px 45px rgba(0, 0, 0, 0.45)',
+                zIndex: 9999,
+                overflow: 'hidden',
+                backdropFilter: 'blur(16px)'
+              }}
+            >
+              <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', background: 'var(--bg-surface-hover)' }}>
+                <span style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Matches ({searchResults.length})
+                </span>
+                <span>ESC to close</span>
+              </div>
+
+              <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
+                {searchResults.length > 0 ? (
+                  searchResults.map((app) => {
+                    const stageInfo = app.archived
+                      ? { label: 'Archived', color: '#94A3B8', bg: 'rgba(148, 163, 184, 0.18)' }
+                      : (STAGE_LABELS[app.status] || { label: app.status, color: 'var(--text-secondary)', bg: 'var(--bg-surface-hover)' });
+
+                    return (
+                      <div
+                        key={app.id}
+                        onClick={() => {
+                          onSelectApp?.(app);
+                          setIsSearchFocused(false);
+                        }}
+                        style={{
+                          padding: '10px 14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '12px',
+                          cursor: 'pointer',
+                          borderBottom: '1px solid var(--border-color)',
+                          transition: 'background 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'var(--bg-surface-hover)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'transparent';
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                          <div
+                            style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '8px',
+                              background: stageInfo.bg,
+                              color: stageInfo.color,
+                              fontWeight: 800,
+                              fontSize: '0.8rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0
+                            }}
+                          >
+                            {(app.company || 'J').slice(0, 2).toUpperCase()}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {app.company}
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {app.title} {app.location ? `· ${app.location}` : ''}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                          <span
+                            style={{
+                              fontSize: '0.7rem',
+                              fontWeight: 700,
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              color: stageInfo.color,
+                              background: stageInfo.bg,
+                              border: `1px solid ${stageInfo.color}33`,
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {stageInfo.label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div style={{ padding: '24px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                      No applications match "{searchQuery}"
+                    </p>
+                    <span style={{ fontSize: '0.78rem' }}>Check spelling, or try searching by role or location</span>
+                  </div>
+                )}
+              </div>
+
+              {searchResults.length > 0 && (
+                <div style={{ padding: '8px 14px', background: 'var(--bg-surface-hover)', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+                  Click an application to view full details
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* View Switcher Tabs */}
