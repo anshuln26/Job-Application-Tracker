@@ -290,6 +290,7 @@ export default function App() {
           setActiveUserSession(null);
           setUser(GUEST_USER);
           setApplications(INITIAL_APPLICATIONS);
+          setIsAuthModalOpen(true);
         }
       });
 
@@ -329,8 +330,8 @@ export default function App() {
     setActiveUserSession(null);
     setUser(GUEST_USER);
     setApplications(INITIAL_APPLICATIONS);
-    setIsAuthModalOpen(false);
-    showToast('Signed out. You are now in Guest Mode.', 'info');
+    setIsAuthModalOpen(true);
+    showToast('Signed out successfully.', 'info');
   };
 
   const handleContinueAsGuest = () => {

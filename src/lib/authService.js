@@ -521,7 +521,11 @@ export const signInWithGoogle = async () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl
+          redirectTo: redirectUrl,
+          queryParams: {
+            prompt: 'select_account',
+            access_type: 'offline'
+          }
         }
       });
 
@@ -546,9 +550,27 @@ export const signOut = async () => {
     try {
       await supabase.auth.signOut();
     } catch (e) {
-      console.warn('Supabase sign-out error:', e);
+      console.warn('Supabase sign-out network notice:', e);
+      try {
+        await supabase.auth.signOut({ scope: 'local' });
+      } catch (localErr) {
+        console.warn('Supabase local sign-out notice:', localErr);
+      }
     }
   }
+
+  // Clear any residual Supabase auth tokens from localStorage
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) {
+        localStorage.removeItem(k);
+      }
+    }
+  } catch (cleanErr) {
+    // Ignore storage iteration errors
+  }
+
   setActiveUserSession(null);
   return { success: true };
 };

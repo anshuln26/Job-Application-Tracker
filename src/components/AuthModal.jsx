@@ -492,9 +492,11 @@ export default function AuthModal({
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() => {
-              onSignOut();
-              onClose?.();
+            onClick={async () => {
+              await onSignOut();
+              setMode('login');
+              setErrorMsg('');
+              setInfoMsg('');
             }}
             style={{ width: '100%', height: '44px', fontWeight: 600, color: 'var(--status-rejected)' }}
           >
