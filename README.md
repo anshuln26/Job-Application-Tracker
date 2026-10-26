@@ -7,7 +7,7 @@
 [![WCAG](https://img.shields.io/badge/Accessibility-WCAG%20AA-blueviolet?style=for-the-badge)](https://www.w3.org/WAI/standards-guidelines/wcag/)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
-A modern, cloud-synced career management platform designed for global software engineering job seekers and interns. Track applications across stages, manage interview schedules, monitor LinkedIn referrals, visualize compensation analytics in INR and USD, compare offers, and securely sync everything to a PostgreSQL cloud database.
+A modern, cloud-synced career management platform designed for global software engineering job seekers and interns. Features a mandatory first-screen authentication gate, a 100% blank guest exploration mode, strict multi-user cloud vault isolation with Supabase PostgreSQL, dual-currency analytics (INR/USD), interview schedule tracking, LinkedIn referral monitoring, and offer comparison.
 
 🌐 **Live Application**: [https://job-application-tracker-alpha-seven.vercel.app](https://job-application-tracker-alpha-seven.vercel.app)
 
@@ -133,10 +133,20 @@ A modern, cloud-synced career management platform designed for global software e
 
 ---
 
-### 🔐 11. Consumer SaaS Authentication & Google OAuth
-- **Consumer-Grade Auth Experience**: Clean, intuitive modal featuring separate **Sign In** and **Create Account** flows.
-- **Continue with Google**: Modern Google-based OAuth authentication with secure encryption, alongside standard email and password authentication.
-- **Strict Data & Profile Isolation**: Every user receives an isolated profile and database vault with unique namespaces (`usr_...`, `goog_...`). Personal job applications, notes, resumes, and timelines are 100% private and protected.
+### 🔐 11. Initial Authentication Gate & Multi-User Cloud Isolation
+- **First-Screen Authentication Gate (Zero Data Leaks)**:
+  - When opening CareerTrack Pro (in **Incognito**, a fresh browser, or after signing out), the application enforces an **Authentication Gate** upfront before exposing the dashboard.
+  - The dashboard is guarded until the visitor authenticates or deliberately chooses Guest Mode.
+- **Enter as Guest User (100% Blank Slate — No Mock Data)**:
+  - Prospective users can click **"Enter as Guest User (Try without an account) →"** to evaluate the complete platform instantly.
+  - Opens a **completely blank workspace (0 applications)** with zero sample or demo data clutter, ready for entering real job applications immediately.
+  - Displays a persistent in-session warning banner clarifying that changes are temporary to the active browser tab and will not be backed up to the cloud.
+- **Strict User Account & Cloud Vault Isolation**:
+  - Signing in via **Google OAuth** or **Email & Password** opens only the personal data associated with that specific account ID.
+  - Every account possesses a private PostgreSQL cloud vault protected by Supabase Row-Level Security (RLS) policies scoped strictly to `auth.uid() = user_id`.
+  - Switching between different user accounts seamlessly isolates their respective pipeline, interviews, offer comparisons, notes, and custom location presets.
+- **Clean Sign-Out Protection**:
+  - Clicking **Sign Out** immediately flushes in-memory tab state (`sessionStorage`), purges active session credentials, clears the application view to 0, and returns directly to the Authentication Gate.
 - **Zero Technical Friction**: Removed technical database settings and cloud configuration prompts from the end-user interface.
 
 ---
@@ -148,9 +158,9 @@ A modern, cloud-synced career management platform designed for global software e
 
 ---
 
-### ☁️ 13. Dual-Mode Cloud Sync & Offline Architecture
+### ☁️ 13. Dual-Mode Cloud Sync & Session-Safe Architecture
 - **Cloud Mode**: Real-time cloud sync with Supabase PostgreSQL, GoTrue / Google OAuth authentication, and Row Level Security (RLS).
-- **Offline / Local Mode**: 100% functional without an account or internet connection using browser `localStorage`.
+- **Guest / In-Session Mode**: 100% functional without an account or internet connection using browser `sessionStorage`. Zero sample/demo data is injected — guests start with an empty slate and can export their data as JSON anytime.
 - **Zero-Loss Migration**: JSON import/export functionality for effortless data portability and backups.
 - **Forward-Compatible Metadata Engine**: Custom metadata serialization (`<!-- CT_META: ... :CT_META -->`) ensures all global fields persist cleanly to PostgreSQL text fields without requiring destructive database schema alterations.
 
