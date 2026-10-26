@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Mail,
@@ -9,9 +9,20 @@ import {
   AlertCircle,
   ShieldCheck,
   ArrowLeft,
-  Check
+  CheckCircle2,
+  KeyRound,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
-import { signInWithEmail, signUpWithEmail, signInWithGoogle } from '../lib/authService';
+import {
+  signInWithEmail,
+  signUpWithEmail,
+  resendVerificationCode,
+  verifySignupCode,
+  requestPasswordReset,
+  verifyAndResetPassword,
+  signInWithGoogle
+} from '../lib/authService';
 
 export default function AuthModal({
   isOpen,
@@ -20,24 +31,319 @@ export default function AuthModal({
   showToast,
   user,
   onSignOut,
-  applicationsCount = 0
+  applicationsCount = 0,
+  isGate = false
 }) {
-  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  // Mode: 'login' | 'signup' | 'verify_signup' | 'forgot_password' | 'reset_password'
+  const [mode, setMode] = useState('login');
+
+  // Form Fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+
+  // 6-Digit OTP State
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [activeOtpCode, setActiveOtpCode] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Status
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [googleChooser, setGoogleChooser] = useState(false);
-  const [customGoogleEmail, setCustomGoogleEmail] = useState('');
-  const [showCustomGoogle, setShowCustomGoogle] = useState(false);
+  const [infoMsg, setInfoMsg] = useState('');
 
-  if (!isOpen) return null;
+  // Refs for 6-digit OTP inputs
+  const otpInputRefs = useRef([]);
 
-  // If user is already logged in, show their profile management card
-  if (user) {
+  // Timer for resend cooldown
+  useEffect(() => {
+    let timer;
+    if (resendCooldown > 0) {
+      timer = setInterval(() => {
+        setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  // Focus first OTP box when entering verification mode
+  useEffect(() => {
+    if ((mode === 'verify_signup' || mode === 'reset_password') && otpInputRefs.current[0]) {
+      setTimeout(() => {
+        otpInputRefs.current[0]?.focus();
+      }, 100);
+    }
+  }, [mode]);
+
+  if (!isOpen && !isGate) return null;
+
+  // Handle OTP digit change with auto-focus
+  const handleOtpChange = (index, value) => {
+    // Only accept numeric characters
+    const cleanVal = value.replace(/\D/g, '');
+    
+    // Support paste of multi-digit code
+    if (cleanVal.length > 1) {
+      const digits = cleanVal.slice(0, 6).split('');
+      const newOtp = [...otp];
+      digits.forEach((d, i) => {
+        if (index + i < 6) newOtp[index + i] = d;
+      });
+      setOtp(newOtp);
+      const nextIndex = Math.min(index + digits.length, 5);
+      otpInputRefs.current[nextIndex]?.focus();
+      return;
+    }
+
+    const newOtp = [...otp];
+    newOtp[index] = cleanVal ? cleanVal[cleanVal.length - 1] : '';
+    setOtp(newOtp);
+
+    // Auto-advance
+    if (cleanVal && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  // 1. Submit Sign In
+  const handleSignIn = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setInfoMsg('');
+    setLoading(true);
+
+    try {
+      const res = await signInWithEmail(email, password);
+      if (res.success) {
+        showToast?.(`Welcome back, ${res.user.name}!`);
+        onAuthSuccess(res.user);
+        if (!isGate) onClose?.();
+      } else {
+        if (res.unconfirmed) {
+          setErrorMsg(res.error);
+          // Offer instant transition to email verification
+          setEmail(res.email || email);
+          const newCode = await resendVerificationCode(res.email || email, 'signup');
+          setActiveOtpCode(newCode.code);
+          setResendCooldown(30);
+          setMode('verify_signup');
+          setInfoMsg('Enter the 6-digit code below to confirm and activate your account.');
+        } else {
+          setErrorMsg(res.error || 'Invalid email or password.');
+        }
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Sign in failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2. Submit Sign Up
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setInfoMsg('');
+
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match.');
+      return;
+    }
+    if (password.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await signUpWithEmail(name, email, password);
+      if (res.success && res.requiresVerification) {
+        setActiveOtpCode(res.code);
+        setOtp(['', '', '', '', '', '']);
+        setResendCooldown(30);
+        setMode('verify_signup');
+        setInfoMsg(`We've sent a 6-digit verification code to ${email}.`);
+      } else if (res.success && res.user) {
+        showToast?.(`Account created! Welcome, ${res.user.name}.`);
+        onAuthSuccess(res.user);
+        if (!isGate) onClose?.();
+      } else {
+        setErrorMsg(res.error || 'Failed to create account.');
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Account creation encountered an error.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Submit Verify Signup OTP
+  const handleVerifySignup = async (e) => {
+    e?.preventDefault();
+    const fullCode = otp.join('');
+    if (fullCode.length !== 6) {
+      setErrorMsg('Please enter all 6 digits of the verification code.');
+      return;
+    }
+
+    setErrorMsg('');
+    setInfoMsg('');
+    setLoading(true);
+
+    try {
+      const res = await verifySignupCode(email, fullCode, password);
+      if (res.success) {
+        showToast?.('Email verified successfully! Welcome aboard.');
+        if (res.user) {
+          onAuthSuccess(res.user);
+        } else {
+          // If needs login
+          setMode('login');
+          setInfoMsg('Email verified! You can now log in with your credentials.');
+        }
+        if (!isGate && res.user) onClose?.();
+      } else {
+        setErrorMsg(res.error || 'Invalid or expired 6-digit verification code.');
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Verification failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 4. Request Password Reset (Step 1)
+  const handleRequestPasswordReset = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setInfoMsg('');
+
+    if (!email || !email.includes('@')) {
+      setErrorMsg('Please enter a valid account email.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await requestPasswordReset(email);
+      if (res.success) {
+        setActiveOtpCode(res.code);
+        setOtp(['', '', '', '', '', '']);
+        setResendCooldown(30);
+        setMode('reset_password');
+        setInfoMsg(`Enter the 6-digit recovery code sent to ${email}.`);
+      } else {
+        setErrorMsg(res.error || 'Failed to dispatch reset code.');
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to send recovery code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 5. Submit Password Reset (Step 2)
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    const fullCode = otp.join('');
+    if (fullCode.length !== 6) {
+      setErrorMsg('Please enter the 6-digit verification code.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setErrorMsg('Passwords do not match.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+
+    setErrorMsg('');
+    setInfoMsg('');
+    setLoading(true);
+
+    try {
+      const res = await verifyAndResetPassword(email, fullCode, newPassword);
+      if (res.success) {
+        showToast?.('Password successfully updated!');
+        if (res.user) {
+          onAuthSuccess(res.user);
+          if (!isGate) onClose?.();
+        } else {
+          setMode('login');
+          setPassword('');
+          setInfoMsg('Password updated! Please log in with your new password.');
+        }
+      } else {
+        setErrorMsg(res.error || 'Invalid verification code or reset failed.');
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to reset password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle Resend Code
+  const handleResendCode = async () => {
+    if (resendCooldown > 0) return;
+    setErrorMsg('');
+    setInfoMsg('Sending new verification code...');
+
+    try {
+      const res = await resendVerificationCode(
+        email,
+        mode === 'reset_password' ? 'recovery' : 'signup'
+      );
+      if (res.success) {
+        setActiveOtpCode(res.code);
+        setResendCooldown(30);
+        setInfoMsg(`New 6-digit code dispatched to ${email}.`);
+        showToast?.('New 6-digit verification code sent!');
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Failed to resend code.');
+    }
+  };
+
+  // Genuine Google OAuth Sign-in Redirect
+  const handleGoogleOAuth = async () => {
+    setErrorMsg('');
+    setLoading(true);
+    try {
+      const res = await signInWithGoogle();
+      if (!res.success) {
+        if (res.error?.includes('provider is not enabled')) {
+          setErrorMsg(
+            'Google OAuth provider requires Google Client ID in Supabase dashboard. Please use Email & Password with 6-digit verification below.'
+          );
+        } else {
+          setErrorMsg(res.error || 'Google OAuth failed to initialize.');
+        }
+      }
+      // If success, browser redirects automatically
+    } catch (err) {
+      setErrorMsg(err.message || 'Google OAuth error.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // If user is already logged in and opens profile dialog
+  if (user && !isGate) {
     return (
       <div
         style={{
@@ -70,434 +376,151 @@ export default function AuthModal({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Close button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+              Account Profile
+            </h3>
             <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ width: '32px', height: '32px' }}>
               <X size={18} />
             </button>
           </div>
 
-          {/* User Profile Avatar & Header */}
-          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-            <div
-              style={{
-                width: '72px',
-                height: '72px',
-                borderRadius: '50%',
-                background: user.authProvider === 'google'
-                  ? 'linear-gradient(135deg, #4285F4, #34A853)'
-                  : 'linear-gradient(135deg, var(--accent-primary), #8B5CF6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 14px auto',
-                color: '#fff',
-                fontSize: '1.75rem',
-                fontWeight: 800,
-                boxShadow: '0 6px 20px var(--accent-glow)'
-              }}
-            >
-              {user.avatar ? (
-                <img
-                  src={user.avatar}
-                  alt={user.name || user.email}
-                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-                />
-              ) : (
-                (user.name || user.email || 'U')[0].toUpperCase()
-              )}
-            </div>
-
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
-              {user.name || user.email.split('@')[0]}
-            </h3>
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0 }}>
-              {user.email}
-            </p>
-
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '10px' }}>
-              {user.authProvider === 'google' ? (
-                <span
-                  style={{
-                    background: 'rgba(66, 133, 244, 0.12)',
-                    border: '1px solid rgba(66, 133, 244, 0.3)',
-                    color: '#4285F4',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    padding: '2px 10px',
-                    borderRadius: '12px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <span>Google Account</span>
-                </span>
-              ) : (
-                <span
-                  style={{
-                    background: 'rgba(16, 185, 129, 0.12)',
-                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                    color: '#10B981',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    padding: '2px 10px',
-                    borderRadius: '12px',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  <ShieldCheck size={12} /> Email Verified
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Account Metrics Card */}
           <div
-            style={{
-              background: 'var(--bg-surface-hover)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-color)',
-              padding: '16px',
-              marginBottom: '20px',
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: '12px',
-              textAlign: 'center'
-            }}
-          >
-            <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Saved Applications</div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
-                {applicationsCount}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Data Privacy</div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--status-offer)', marginTop: '6px' }}>
-                Isolated Vault
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button
-              className="btn btn-secondary"
-              onClick={onClose}
-              style={{ height: '42px', fontSize: '0.9rem', justifyContent: 'center' }}
-            >
-              Continue to My Workspace
-            </button>
-            <button
-              className="btn"
-              onClick={() => {
-                onSignOut();
-                onClose();
-              }}
-              style={{
-                height: '42px',
-                fontSize: '0.9rem',
-                justifyContent: 'center',
-                background: 'rgba(239, 68, 68, 0.1)',
-                color: '#EF4444',
-                border: '1px solid rgba(239, 68, 68, 0.25)'
-              }}
-            >
-              Sign Out of Account
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Handle Form Submission (Sign In or Sign Up)
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErrorMsg('');
-
-    if (mode === 'signup') {
-      if (password !== confirmPassword) {
-        setErrorMsg('Passwords do not match. Please verify your password.');
-        return;
-      }
-      if (password.length < 6) {
-        setErrorMsg('Password must be at least 6 characters long.');
-        return;
-      }
-      setLoading(true);
-      const res = await signUpWithEmail(name, email, password);
-      setLoading(false);
-      if (res.success) {
-        showToast(`Welcome to CareerTrack Pro, ${res.user.name}!`);
-        onAuthSuccess(res.user);
-        onClose();
-      } else {
-        setErrorMsg(res.error || 'Failed to create account.');
-      }
-    } else {
-      setLoading(true);
-      const res = await signInWithEmail(email, password);
-      setLoading(false);
-      if (res.success) {
-        showToast(`Welcome back, ${res.user.name}!`);
-        onAuthSuccess(res.user);
-        onClose();
-      } else {
-        setErrorMsg(res.error || 'Invalid email or password.');
-      }
-    }
-  };
-
-  // Handle Google OAuth with selected account profile
-  const handleGoogleSignInWithProfile = async (profile) => {
-    setLoading(true);
-    setErrorMsg('');
-    try {
-      const res = await signInWithGoogle(profile);
-      setLoading(false);
-      if (res.success && res.user) {
-        showToast(`Signed in with Google as ${res.user.name}!`);
-        onAuthSuccess(res.user);
-        setGoogleChooser(false);
-        onClose();
-      } else {
-        setErrorMsg(res.error || 'Google authentication failed.');
-      }
-    } catch (err) {
-      setLoading(false);
-      setErrorMsg(err.message || 'Google authentication encountered an error.');
-    }
-  };
-
-  // Google Account Chooser Screen
-  if (googleChooser) {
-    return (
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.75)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: '16px'
-        }}
-        onClick={onClose}
-      >
-        <div
-          className="glass-panel animate-fade-in"
-          style={{
-            width: '100%',
-            maxWidth: '440px',
-            background: 'var(--bg-surface)',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-            boxShadow: '0 24px 60px rgba(0, 0, 0, 0.6)',
-            border: '1px solid var(--border-color)',
-            padding: '28px'
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Top Bar with Back and Close */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-            <button
-              className="btn btn-ghost btn-icon"
-              onClick={() => {
-                setGoogleChooser(false);
-                setShowCustomGoogle(false);
-              }}
-              style={{ width: '32px', height: '32px' }}
-              title="Back"
-            >
-              <ArrowLeft size={18} />
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"/>
-                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
-                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
-                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
-              </svg>
-              <span style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>Google Sign-In</span>
-            </div>
-            <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ width: '32px', height: '32px' }}>
-              <X size={18} />
-            </button>
-          </div>
-
-          <div style={{ textAlign: 'center', marginBottom: '22px' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
-              Choose a Google Account
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-              to continue to CareerTrack Pro Cloud Vault
-            </p>
-          </div>
-
-          {/* Account 1: Anshul's Personal Google Account Card */}
-          <div
-            onClick={() => handleGoogleSignInWithProfile({ email: 'anshulnimore.26@gmail.com', name: 'Anshul Singh' })}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '14px',
-              padding: '14px 16px',
+              gap: '16px',
+              padding: '16px',
               borderRadius: '12px',
               background: 'var(--bg-surface-hover)',
               border: '1px solid var(--border-color)',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              marginBottom: '14px'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#4285F4';
-              e.currentTarget.style.background = 'var(--bg-surface)';
-              e.currentTarget.style.boxShadow = '0 6px 18px rgba(66, 133, 244, 0.2)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border-color)';
-              e.currentTarget.style.background = 'var(--bg-surface-hover)';
-              e.currentTarget.style.boxShadow = 'none';
+              marginBottom: '20px'
             }}
           >
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #4285F4, #34A853)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
-                fontSize: '1.2rem',
-                fontWeight: 800,
-                flexShrink: 0,
-                boxShadow: '0 2px 8px rgba(66, 133, 244, 0.4)'
-              }}
-            >
-              A
-            </div>
+            <img
+              src={user.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name || 'User')}`}
+              alt={user.name}
+              style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)' }}
+            />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-primary)' }}>Anshul Singh</span>
+              <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-primary)' }}>
+                {user.name || 'Personal Account'}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user.email}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                 <span
                   style={{
                     fontSize: '0.7rem',
+                    fontWeight: 700,
                     padding: '2px 8px',
-                    borderRadius: '10px',
-                    background: 'rgba(66, 133, 244, 0.12)',
-                    color: '#4285F4',
-                    fontWeight: 700
+                    borderRadius: '8px',
+                    background: 'rgba(52, 168, 83, 0.15)',
+                    color: '#34A853',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
                   }}
                 >
-                  Personal Cloud
+                  <ShieldCheck size={11} /> Verified Account
                 </span>
-              </div>
-              <div style={{ fontSize: '0.825rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                anshulnimore.26@gmail.com
-              </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--status-offer)', marginTop: '2px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <Check size={12} /> Cloud Database Linked · 11 Applications
+                <span
+                  style={{
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    padding: '2px 8px',
+                    borderRadius: '8px',
+                    background: 'rgba(99, 102, 241, 0.15)',
+                    color: 'var(--primary)'
+                  }}
+                >
+                  Supabase Cloud
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Account 2: Use another Google account toggle */}
-          {!showCustomGoogle ? (
-            <button
-              type="button"
-              onClick={() => setShowCustomGoogle(true)}
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                borderRadius: '12px',
-                background: 'transparent',
-                border: '1px dashed var(--border-color)',
-                color: 'var(--text-secondary)',
-                fontSize: '0.85rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--text-primary)';
-                e.currentTarget.style.color = 'var(--text-primary)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-color)';
-                e.currentTarget.style.color = 'var(--text-secondary)';
-              }}
-            >
-              <User size={15} />
-              <span>Use another Google account</span>
-            </button>
-          ) : (
-            <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--bg-surface-hover)', border: '1px solid var(--border-color)' }}>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
-                Google Email Address
-              </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  type="email"
-                  placeholder="yourname@gmail.com"
-                  className="form-input"
-                  value={customGoogleEmail}
-                  onChange={(e) => setCustomGoogleEmail(e.target.value)}
-                  style={{ height: '38px', fontSize: '0.85rem' }}
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={!customGoogleEmail || !customGoogleEmail.includes('@') || loading}
-                  onClick={() => handleGoogleSignInWithProfile({ email: customGoogleEmail })}
-                  style={{ height: '38px', padding: '0 14px', fontSize: '0.825rem', whiteSpace: 'nowrap' }}
-                >
-                  Continue
-                </button>
-              </div>
+          <div style={{ background: 'var(--bg-surface-hover)', borderRadius: '12px', padding: '14px 16px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '8px' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Personal Applications</span>
+              <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{applicationsCount} Active Jobs</span>
             </div>
-          )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-secondary)' }}>Data Isolation</span>
+              <span style={{ fontWeight: 600, color: '#34A853' }}>100% Encrypted & Isolated</span>
+            </div>
+          </div>
 
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '22px', marginBottom: 0 }}>
-            To continue, Google will securely link your personal email and application database vault with CareerTrack Pro.
-          </p>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              onSignOut();
+              onClose?.();
+            }}
+            style={{ width: '100%', height: '44px', fontWeight: 600, color: 'var(--status-rejected)' }}
+          >
+            Sign Out of Account
+          </button>
         </div>
       </div>
     );
   }
 
+  // Authentication Container (Gate or Modal)
   return (
     <div
       style={{
-        position: 'fixed',
+        position: isGate ? 'relative' : 'fixed',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0, 0, 0, 0.75)',
-        backdropFilter: 'blur(8px)',
+        minHeight: isGate ? '100vh' : 'auto',
+        background: isGate
+          ? 'radial-gradient(ellipse at 50% 20%, rgba(99, 102, 241, 0.15) 0%, var(--bg-base) 70%)'
+          : 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: isGate ? 'none' : 'blur(10px)',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
-        padding: '16px'
+        padding: '24px 16px'
       }}
-      onClick={onClose}
+      onClick={isGate ? undefined : onClose}
     >
+      {/* Brand Header for Gate */}
+      {isGate && (
+        <div style={{ textAlign: 'center', marginBottom: '28px' }} className="animate-fade-in">
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+            <div
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, var(--primary), #8b5cf6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff',
+                boxShadow: '0 8px 24px rgba(99, 102, 241, 0.4)'
+              }}
+            >
+              <Sparkles size={22} />
+            </div>
+            <span style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--text-primary)' }}>
+              CareerTrack <span style={{ color: 'var(--primary)' }}>Pro</span>
+            </span>
+          </div>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', margin: 0, maxWidth: '420px' }}>
+            Enterprise-grade Job Application & Offer Intelligence. Sign in to access your personal vault.
+          </p>
+        </div>
+      )}
+
+      {/* Main Auth Card */}
       <div
         className="glass-panel animate-fade-in"
         style={{
@@ -506,43 +529,58 @@ export default function AuthModal({
           background: 'var(--bg-surface)',
           borderRadius: 'var(--radius-lg)',
           overflow: 'hidden',
-          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.6)',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.5)',
           border: '1px solid var(--border-color)',
-          padding: '32px'
+          padding: '30px'
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Modal Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '22px' }}>
-          <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-              {mode === 'login' ? 'Welcome Back' : 'Create an Account'}
-            </h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-              {mode === 'login'
-                ? 'Sign in to access your personal job application tracker.'
-                : 'Start tracking job applications with your isolated personal vault.'}
-            </p>
-          </div>
-          <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ width: '32px', height: '32px' }}>
-            <X size={18} />
-          </button>
+        {/* Top Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+          {mode === 'verify_signup' || mode === 'forgot_password' || mode === 'reset_password' ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon"
+              onClick={() => {
+                setMode('login');
+                setErrorMsg('');
+                setInfoMsg('');
+              }}
+              style={{ width: '32px', height: '32px' }}
+              title="Back to Sign In"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck size={18} style={{ color: 'var(--primary)' }} />
+              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Secure Auth
+              </span>
+            </div>
+          )}
+
+          {!isGate && (
+            <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ width: '32px', height: '32px' }}>
+              <X size={18} />
+            </button>
+          )}
         </div>
 
-        {/* Error Feedback */}
+        {/* Alerts */}
         {errorMsg && (
           <div
             style={{
-              background: 'rgba(239, 68, 68, 0.12)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
-              color: '#EF4444',
-              borderRadius: '8px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              color: 'var(--status-rejected)',
+              borderRadius: '10px',
               padding: '10px 14px',
               fontSize: '0.825rem',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              marginBottom: '18px'
+              marginBottom: '16px'
             }}
           >
             <AlertCircle size={16} style={{ flexShrink: 0 }} />
@@ -550,239 +588,709 @@ export default function AuthModal({
           </div>
         )}
 
-        {/* Google OAuth Button */}
-        <button
-          type="button"
-          onClick={() => setGoogleChooser(true)}
-          disabled={loading}
-          style={{
-            width: '100%',
-            height: '46px',
-            background: 'var(--bg-surface-hover)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '12px',
-            color: 'var(--text-primary)',
-            fontSize: '0.9rem',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = '#4285F4';
-            e.currentTarget.style.background = 'var(--bg-surface)';
-            e.currentTarget.style.boxShadow = '0 4px 14px rgba(66, 133, 244, 0.2)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--border-color)';
-            e.currentTarget.style.background = 'var(--bg-surface-hover)';
-            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.05)';
-          }}
-        >
-          {/* Official Google G Logo */}
-          <svg width="18" height="18" viewBox="0 0 24 24">
-            <path
-              fill="#4285F4"
-              d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"
-            />
-            <path
-              fill="#34A853"
-              d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
-            />
-            <path
-              fill="#FBBC05"
-              d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-            />
-            <path
-              fill="#EA4335"
-              d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-            />
-          </svg>
-          <span>Continue with Google</span>
-        </button>
-
-        {/* Divider */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            margin: '20px 0',
-            color: 'var(--text-muted)',
-            fontSize: '0.75rem',
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em'
-          }}
-        >
-          <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
-          <span style={{ padding: '0 12px' }}>or continue with email</span>
-          <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
-        </div>
-
-        {/* Email & Password Form */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {mode === 'signup' && (
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
-                Full Name
-              </label>
-              <div style={{ position: 'relative' }}>
-                <User size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Anshul Sharma"
-                  className="form-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  style={{ paddingLeft: '36px', height: '42px', fontSize: '0.875rem' }}
-                />
-              </div>
-            </div>
-          )}
-
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
-              Email Address
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Mail size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="email"
-                required
-                placeholder="name@example.com"
-                className="form-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                style={{ paddingLeft: '36px', height: '42px', fontSize: '0.875rem' }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Password
-              </label>
-            </div>
-            <div style={{ position: 'relative' }}>
-              <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                required
-                placeholder="Enter password (min 6 chars)"
-                className="form-input"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{ paddingLeft: '36px', paddingRight: '36px', height: '42px', fontSize: '0.875rem' }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--text-muted)',
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </div>
-          </div>
-
-          {mode === 'signup' && (
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
-                Confirm Password
-              </label>
-              <div style={{ position: 'relative' }}>
-                <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  placeholder="Re-enter your password"
-                  className="form-input"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  style={{ paddingLeft: '36px', height: '42px', fontSize: '0.875rem' }}
-                />
-              </div>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading}
+        {infoMsg && (
+          <div
             style={{
-              height: '44px',
-              fontSize: '0.9rem',
-              fontWeight: 700,
-              justifyContent: 'center',
-              marginTop: '8px',
-              boxShadow: '0 4px 14px var(--accent-glow)'
+              background: 'rgba(52, 168, 83, 0.1)',
+              border: '1px solid rgba(52, 168, 83, 0.25)',
+              color: '#34A853',
+              borderRadius: '10px',
+              padding: '10px 14px',
+              fontSize: '0.825rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '16px'
             }}
           >
-            {loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Create Free Account'}
-          </button>
-        </form>
+            <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+            <span>{infoMsg}</span>
+          </div>
+        )}
 
-        {/* Toggle Mode Footer */}
-        <div style={{ marginTop: '22px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          {mode === 'login' ? (
-            <span>
+        {/* ----------------- MODE: SIGN IN ----------------- */}
+        {mode === 'login' && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
+                Welcome Back
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                Sign in to your personal job tracker vault
+              </p>
+            </div>
+
+            {/* Google OAuth Button */}
+            <button
+              type="button"
+              onClick={handleGoogleOAuth}
+              disabled={loading}
+              style={{
+                width: '100%',
+                height: '46px',
+                background: 'var(--bg-surface-hover)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                color: 'var(--text-primary)',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                marginBottom: '18px'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--text-primary)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-color)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+              <span>Continue with Google</span>
+            </button>
+
+            {/* Separator */}
+            <div style={{ display: 'flex', alignItems: 'center', margin: '16px 0 20px', gap: '12px' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+                OR SIGN IN WITH EMAIL
+              </span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+            </div>
+
+            <form onSubmit={handleSignIn}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                  Email Address
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', height: '42px', fontSize: '0.9rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('forgot_password');
+                      setErrorMsg('');
+                      setInfoMsg('');
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: 'var(--primary)',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Enter password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', paddingRight: '40px', height: '42px', fontSize: '0.9rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+                style={{ width: '100%', height: '44px', fontSize: '0.925rem', fontWeight: 700, borderRadius: '10px' }}
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+
+            <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               Don't have an account?{' '}
               <button
                 type="button"
                 onClick={() => {
                   setMode('signup');
                   setErrorMsg('');
+                  setInfoMsg('');
                 }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--accent-primary)',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  padding: 0
-                }}
+                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}
               >
                 Sign up
               </button>
-            </span>
-          ) : (
-            <span>
+            </div>
+          </div>
+        )}
+
+        {/* ----------------- MODE: SIGN UP ----------------- */}
+        {mode === 'signup' && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+              <h3 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
+                Create an Account
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                Start tracking job applications with your isolated personal vault
+              </p>
+            </div>
+
+            {/* Google OAuth Button */}
+            <button
+              type="button"
+              onClick={handleGoogleOAuth}
+              disabled={loading}
+              style={{
+                width: '100%',
+                height: '46px',
+                background: 'var(--bg-surface-hover)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                color: 'var(--text-primary)',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                marginBottom: '18px'
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+              <span>Continue with Google</span>
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', margin: '16px 0 20px', gap: '12px' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+                OR REGISTER WITH EMAIL
+              </span>
+              <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+            </div>
+
+            <form onSubmit={handleSignUp}>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                  Full Name
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Your Name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', height: '40px', fontSize: '0.875rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                  Email Address
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', height: '40px', fontSize: '0.875rem' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                  Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Min 6 characters"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', paddingRight: '40px', height: '40px', fontSize: '0.875rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                  Confirm Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Repeat password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', height: '40px', fontSize: '0.875rem' }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+                style={{ width: '100%', height: '44px', fontSize: '0.925rem', fontWeight: 700, borderRadius: '10px' }}
+              >
+                {loading ? 'Creating Account...' : 'Create Free Account'}
+              </button>
+            </form>
+
+            <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
               Already have an account?{' '}
               <button
                 type="button"
                 onClick={() => {
                   setMode('login');
                   setErrorMsg('');
+                  setInfoMsg('');
                 }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--accent-primary)',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  padding: 0
-                }}
+                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontWeight: 700, cursor: 'pointer' }}
               >
                 Log in
               </button>
-            </span>
-          )}
-        </div>
+            </div>
+          </div>
+        )}
+
+        {/* ----------------- MODE: VERIFY EMAIL (6-DIGIT OTP) ----------------- */}
+        {mode === 'verify_signup' && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  background: 'rgba(99, 102, 241, 0.15)',
+                  color: 'var(--primary)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '12px'
+                }}
+              >
+                <KeyRound size={26} />
+              </div>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
+                Verify Your Email
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                Enter the 6-digit verification code sent to <br />
+                <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
+              </p>
+            </div>
+
+            {/* Simulated / Fallback Verification Banner */}
+            {activeOtpCode && (
+              <div
+                style={{
+                  background: 'rgba(99, 102, 241, 0.08)',
+                  border: '1px dashed var(--primary)',
+                  borderRadius: '10px',
+                  padding: '10px 14px',
+                  textAlign: 'center',
+                  marginBottom: '20px'
+                }}
+              >
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  Security Verification Code Dispatched:
+                </div>
+                <div
+                  style={{
+                    fontSize: '1.25rem',
+                    fontWeight: 800,
+                    letterSpacing: '6px',
+                    color: 'var(--primary)',
+                    fontFamily: 'monospace',
+                    marginTop: '2px'
+                  }}
+                >
+                  {activeOtpCode}
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleVerifySignup}>
+              {/* 6-Digit Boxes */}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '22px' }}>
+                {otp.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => (otpInputRefs.current[idx] = el)}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                    style={{
+                      width: '46px',
+                      height: '52px',
+                      fontSize: '1.4rem',
+                      fontWeight: 800,
+                      textAlign: 'center',
+                      borderRadius: '10px',
+                      background: 'var(--bg-surface-hover)',
+                      border: digit ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      outline: 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  />
+                ))}
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading || otp.join('').length !== 6}
+                style={{ width: '100%', height: '44px', fontSize: '0.925rem', fontWeight: 700, borderRadius: '10px' }}
+              >
+                {loading ? 'Verifying...' : 'Verify & Activate Account'}
+              </button>
+            </form>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
+              <button
+                type="button"
+                onClick={() => setMode('signup')}
+                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer' }}
+              >
+                Change Email
+              </button>
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={resendCooldown > 0}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: resendCooldown > 0 ? 'var(--text-muted)' : 'var(--primary)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <RefreshCw size={12} className={resendCooldown > 0 ? 'animate-spin' : ''} />
+                {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend Code'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ----------------- MODE: FORGOT PASSWORD ----------------- */}
+        {mode === 'forgot_password' && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
+                Reset Your Password
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                Enter your account email to receive a 6-digit verification code.
+              </p>
+            </div>
+
+            <form onSubmit={handleRequestPasswordReset}>
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                  Email Address
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="email"
+                    required
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', height: '42px', fontSize: '0.9rem' }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+                style={{ width: '100%', height: '44px', fontSize: '0.925rem', fontWeight: 700, borderRadius: '10px' }}
+              >
+                {loading ? 'Sending Code...' : 'Send 6-Digit Code'}
+              </button>
+            </form>
+
+            <div style={{ textAlign: 'center', marginTop: '20px' }}>
+              <button
+                type="button"
+                onClick={() => setMode('login')}
+                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--primary)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Remember your password? Log in
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ----------------- MODE: RESET PASSWORD (STEP 2) ----------------- */}
+        {mode === 'reset_password' && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
+                Enter Code & New Password
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                Verification code sent to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
+              </p>
+            </div>
+
+            {activeOtpCode && (
+              <div
+                style={{
+                  background: 'rgba(99, 102, 241, 0.08)',
+                  border: '1px dashed var(--primary)',
+                  borderRadius: '10px',
+                  padding: '8px 12px',
+                  textAlign: 'center',
+                  marginBottom: '16px'
+                }}
+              >
+                <div style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  Security Verification Code:
+                </div>
+                <div
+                  style={{
+                    fontSize: '1.2rem',
+                    fontWeight: 800,
+                    letterSpacing: '6px',
+                    color: 'var(--primary)',
+                    fontFamily: 'monospace',
+                    marginTop: '2px'
+                  }}
+                >
+                  {activeOtpCode}
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleResetPassword}>
+              {/* 6-Digit Boxes */}
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '16px' }}>
+                {otp.map((digit, idx) => (
+                  <input
+                    key={idx}
+                    ref={(el) => (otpInputRefs.current[idx] = el)}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(idx, e.target.value)}
+                    onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                    style={{
+                      width: '44px',
+                      height: '48px',
+                      fontSize: '1.3rem',
+                      fontWeight: 800,
+                      textAlign: 'center',
+                      borderRadius: '10px',
+                      background: 'var(--bg-surface-hover)',
+                      border: digit ? '2px solid var(--primary)' : '1px solid var(--border-color)',
+                      color: 'var(--text-primary)',
+                      outline: 'none'
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                  New Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Min 6 characters"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', paddingRight: '40px', height: '40px', fontSize: '0.875rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                  Confirm New Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Repeat new password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', height: '40px', fontSize: '0.875rem' }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading || otp.join('').length !== 6}
+                style={{ width: '100%', height: '44px', fontSize: '0.925rem', fontWeight: 700, borderRadius: '10px' }}
+              >
+                {loading ? 'Updating Password...' : 'Reset Password & Sign In'}
+              </button>
+            </form>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px' }}>
+              <button
+                type="button"
+                onClick={() => setMode('login')}
+                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer' }}
+              >
+                Back to Sign In
+              </button>
+              <button
+                type="button"
+                onClick={handleResendCode}
+                disabled={resendCooldown > 0}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: resendCooldown > 0 ? 'var(--text-muted)' : 'var(--primary)',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  cursor: resendCooldown > 0 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Footer info for Gate */}
+      {isGate && (
+        <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          CareerTrack Pro · Cloud-Backed with Supabase PostgreSQL · Developed with ❤️ by Anshul
+        </div>
+      )}
     </div>
   );
 }

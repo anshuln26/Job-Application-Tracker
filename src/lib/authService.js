@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 const USERS_DB_KEY = 'careertrack_users_registry_v2';
 const SESSION_KEY = 'careertrack_active_session_v2';
+const PENDING_VERIFICATION_KEY = 'careertrack_pending_verification';
 
 // In-memory listeners for reactive auth state changes
 const authListeners = new Set();
@@ -17,6 +18,18 @@ const notifyListeners = (user) => {
 };
 
 /**
+ * Generate cryptographically sound 6-digit OTP code
+ */
+export const generate6DigitCode = () => {
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return (100000 + (arr[0] % 900000)).toString();
+  }
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+/**
  * Simple, fast hash for local password storage protection
  */
 const hashPassword = async (password) => {
@@ -27,10 +40,9 @@ const hashPassword = async (password) => {
       const hashArray = Array.from(new Uint8Array(hashBuffer));
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     } catch {
-      // Fallback below
+      // Fallback
     }
   }
-  // Lightweight fallback hashing
   let hash = 0;
   const str = password + 'ct_salt_2026';
   for (let i = 0; i < str.length; i++) {
@@ -41,9 +53,6 @@ const hashPassword = async (password) => {
   return 'h_' + Math.abs(hash).toString(16);
 };
 
-/**
- * Retrieve user registry from local database
- */
 const getUsersRegistry = () => {
   try {
     const raw = localStorage.getItem(USERS_DB_KEY);
@@ -53,13 +62,6 @@ const getUsersRegistry = () => {
   }
 };
 
-const saveUsersRegistry = (users) => {
-  try {
-    localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
-  } catch (e) {
-    console.error('Failed to save user registry:', e);
-  }
-};
 
 /**
  * Get currently active authenticated user session
@@ -96,14 +98,29 @@ export const onAuthStateChange = (callback) => {
 export const signInWithEmail = async (email, password) => {
   const cleanEmail = email.trim().toLowerCase();
   
-  // 1. Try Supabase cloud auth first if configured
   if (supabase && isSupabaseConfigured()) {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password
       });
-      if (error) throw error;
+
+      if (error) {
+        // If email not confirmed, signal for 6-digit verification
+        if (
+          error.message?.toLowerCase().includes('email not confirmed') ||
+          error.status === 400 && error.message?.toLowerCase().includes('not confirmed')
+        ) {
+          return {
+            success: false,
+            unconfirmed: true,
+            email: cleanEmail,
+            error: 'Your email address is not yet verified. Please enter the 6-digit verification code.'
+          };
+        }
+        throw error;
+      }
+
       if (data?.user) {
         const userObj = {
           id: data.user.id,
@@ -117,22 +134,31 @@ export const signInWithEmail = async (email, password) => {
         return { success: true, user: userObj };
       }
     } catch (supabaseErr) {
-      console.warn('Supabase sign-in failed, checking personal database:', supabaseErr.message);
-      // If error is invalid login or unconfirmed email, return cleanly
-      if (supabaseErr.message?.includes('Invalid login') || supabaseErr.message?.includes('Email not confirmed')) {
-        return { success: false, error: supabaseErr.message };
+      console.warn('Supabase sign-in error:', supabaseErr.message);
+      
+      // If error is explicit bad credentials or unconfirmed, return directly
+      if (
+        supabaseErr.message?.toLowerCase().includes('invalid login credentials') ||
+        supabaseErr.message?.toLowerCase().includes('email not confirmed')
+      ) {
+        return {
+          success: false,
+          unconfirmed: supabaseErr.message?.toLowerCase().includes('not confirmed'),
+          email: cleanEmail,
+          error: supabaseErr.message
+        };
       }
     }
   }
 
-  // 2. Personal Isolated User Database (Autonomous Engine)
+  // Fallback to local user registry if offline / cloud down
   const users = getUsersRegistry();
   const existingUser = users.find(u => u.email.toLowerCase() === cleanEmail);
 
   if (!existingUser) {
     return {
       success: false,
-      error: 'No account found with this email. Please check your credentials or create a new account.'
+      error: 'Invalid login credentials. Please check your email and password or sign up.'
     };
   }
 
@@ -140,7 +166,7 @@ export const signInWithEmail = async (email, password) => {
   if (existingUser.passwordHash !== hashedInput) {
     return {
       success: false,
-      error: 'Incorrect password. Please try again.'
+      error: 'Invalid login credentials. Please check your email and password.'
     };
   }
 
@@ -158,7 +184,7 @@ export const signInWithEmail = async (email, password) => {
 };
 
 /**
- * Sign Up with Name, Email & Password
+ * Sign Up with Name, Email & Password (Dispatches 6-digit verification code)
  */
 export const signUpWithEmail = async (name, email, password) => {
   const cleanEmail = email.trim().toLowerCase();
@@ -171,10 +197,13 @@ export const signUpWithEmail = async (name, email, password) => {
     return { success: false, error: 'Password must be at least 6 characters long.' };
   }
 
-  // 1. Try Supabase cloud auth if configured
+  // Generate 6-digit verification code
+  const otpCode = generate6DigitCode();
+
+  // 1. Register with Supabase
   if (supabase && isSupabaseConfigured()) {
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email: cleanEmail,
         password,
         options: {
@@ -184,128 +213,297 @@ export const signUpWithEmail = async (name, email, password) => {
           }
         }
       });
+
+      // Even if user already registered or needs confirmation
+      if (error && !error.message?.includes('already registered')) {
+        console.warn('Supabase signUp notice:', error.message);
+      }
+
+      // Store 6-digit verification code in Supabase database
+      const { error: rpcErr } = await supabase.rpc('create_verification_code', {
+        p_email: cleanEmail,
+        p_code: otpCode,
+        p_type: 'signup'
+      });
+
+      if (rpcErr) {
+        console.warn('RPC create_verification_code notice:', rpcErr);
+      }
+    } catch (err) {
+      console.warn('Supabase cloud signup exception:', err);
+    }
+  }
+
+  // Cache pending verification locally so password is known for auto-login after code verification
+  localStorage.setItem(
+    PENDING_VERIFICATION_KEY,
+    JSON.stringify({
+      email: cleanEmail,
+      name: cleanName,
+      password,
+      code: otpCode,
+      createdAt: Date.now()
+    })
+  );
+
+  return {
+    success: true,
+    requiresVerification: true,
+    email: cleanEmail,
+    code: otpCode,
+    name: cleanName
+  };
+};
+
+/**
+ * Resend 6-Digit Verification Code
+ */
+export const resendVerificationCode = async (email, type = 'signup') => {
+  const cleanEmail = email.trim().toLowerCase();
+  const newOtp = generate6DigitCode();
+
+  if (supabase && isSupabaseConfigured()) {
+    try {
+      await supabase.rpc('create_verification_code', {
+        p_email: cleanEmail,
+        p_code: newOtp,
+        p_type: type
+      });
+      if (type === 'recovery') {
+        await supabase.auth.resetPasswordForEmail(cleanEmail);
+      }
+    } catch (e) {
+      console.warn('Failed to resend cloud code:', e);
+    }
+  }
+
+  // Update cached pending code
+  try {
+    const raw = localStorage.getItem(PENDING_VERIFICATION_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.email === cleanEmail) {
+        parsed.code = newOtp;
+        parsed.createdAt = Date.now();
+        localStorage.setItem(PENDING_VERIFICATION_KEY, JSON.stringify(parsed));
+      }
+    }
+  } catch {}
+
+  return { success: true, code: newOtp };
+};
+
+/**
+ * Verify 6-Digit Signup Code & Activate Account
+ */
+export const verifySignupCode = async (email, code, passwordOverride = null) => {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanCode = code.trim();
+
+  let pendingPassword = passwordOverride;
+  let pendingName = cleanEmail.split('@')[0];
+
+  try {
+    const raw = localStorage.getItem(PENDING_VERIFICATION_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed.email === cleanEmail) {
+        pendingPassword = pendingPassword || parsed.password;
+        pendingName = parsed.name || pendingName;
+      }
+    }
+  } catch {}
+
+  // 1. Verify via Supabase RPC
+  if (supabase && isSupabaseConfigured()) {
+    try {
+      const { data, error } = await supabase.rpc('verify_signup_code', {
+        p_email: cleanEmail,
+        p_code: cleanCode
+      });
+
       if (error) throw error;
-      if (data?.user) {
+      if (!data?.success) {
+        return { success: false, error: data?.error || 'Invalid or expired 6-digit code.' };
+      }
+
+      // If we have password, perform automatic cloud login
+      if (pendingPassword) {
+        const loginRes = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: pendingPassword
+        });
+
+        if (loginRes.data?.user) {
+          const userObj = {
+            id: loginRes.data.user.id,
+            email: cleanEmail,
+            name: pendingName,
+            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(pendingName)}`,
+            authProvider: 'email',
+            isCloud: true
+          };
+          setActiveUserSession(userObj);
+          localStorage.removeItem(PENDING_VERIFICATION_KEY);
+          return { success: true, user: userObj };
+        }
+      }
+
+      // If password not in memory, user is verified and can sign in
+      localStorage.removeItem(PENDING_VERIFICATION_KEY);
+      return {
+        success: true,
+        needsLogin: true,
+        message: 'Email successfully verified! Please sign in with your credentials.'
+      };
+    } catch (err) {
+      console.warn('Supabase verification error:', err);
+      return { success: false, error: err.message || 'Verification failed. Please try again.' };
+    }
+  }
+
+  return { success: false, error: 'Database service is unavailable.' };
+};
+
+/**
+ * Request Password Reset (Dispatches 6-Digit Recovery Code)
+ */
+export const requestPasswordReset = async (email) => {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    return { success: false, error: 'Please enter a valid email address.' };
+  }
+
+  const recoveryCode = generate6DigitCode();
+
+  if (supabase && isSupabaseConfigured()) {
+    try {
+      // 1. Create recovery code in Supabase
+      const { error: rpcErr } = await supabase.rpc('create_verification_code', {
+        p_email: cleanEmail,
+        p_code: recoveryCode,
+        p_type: 'recovery'
+      });
+      if (rpcErr) console.warn('RPC create recovery code error:', rpcErr);
+
+      // 2. Also trigger Supabase native email dispatch
+      try {
+        await supabase.auth.resetPasswordForEmail(cleanEmail);
+      } catch (emailErr) {
+        console.warn('Native reset password email dispatch warning:', emailErr);
+      }
+    } catch (e) {
+      console.warn('Supabase recovery request error:', e);
+    }
+  }
+
+  return {
+    success: true,
+    email: cleanEmail,
+    code: recoveryCode
+  };
+};
+
+/**
+ * Verify 6-Digit Code & Reset Password
+ */
+export const verifyAndResetPassword = async (email, code, newPassword) => {
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanCode = code.trim();
+
+  if (!cleanCode || cleanCode.length !== 6) {
+    return { success: false, error: 'Please enter a valid 6-digit verification code.' };
+  }
+  if (!newPassword || newPassword.length < 6) {
+    return { success: false, error: 'New password must be at least 6 characters long.' };
+  }
+
+  if (supabase && isSupabaseConfigured()) {
+    try {
+      const { data, error } = await supabase.rpc('verify_reset_password_code', {
+        p_email: cleanEmail,
+        p_code: cleanCode,
+        p_new_password: newPassword
+      });
+
+      if (error) throw error;
+      if (!data?.success) {
+        return { success: false, error: data?.error || 'Invalid or expired verification code.' };
+      }
+
+      // Automatically sign in with the new password
+      const loginRes = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: newPassword
+      });
+
+      if (loginRes.data?.user) {
         const userObj = {
-          id: data.user.id,
-          email: data.user.email,
-          name: cleanName,
-          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}`,
+          id: loginRes.data.user.id,
+          email: cleanEmail,
+          name: cleanEmail.split('@')[0],
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanEmail)}`,
           authProvider: 'email',
           isCloud: true
         };
         setActiveUserSession(userObj);
-        return { success: true, user: userObj, isCloud: true };
+        return { success: true, user: userObj, message: 'Password reset successfully!' };
       }
-    } catch (supabaseErr) {
-      console.warn('Supabase cloud signup failed, creating personal vault:', supabaseErr.message);
+
+      return {
+        success: true,
+        needsLogin: true,
+        message: 'Password reset successfully! Please sign in with your new password.'
+      };
+    } catch (err) {
+      console.warn('Supabase password reset error:', err);
+      return { success: false, error: err.message || 'Failed to reset password.' };
     }
   }
 
-  // 2. Personal Isolated User Database (Autonomous Engine)
-  const users = getUsersRegistry();
-  const existingUser = users.find(u => u.email.toLowerCase() === cleanEmail);
-
-  if (existingUser) {
-    return {
-      success: false,
-      error: 'An account with this email already exists. Please sign in instead.'
-    };
-  }
-
-  const newUserId = 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
-  const passwordHash = await hashPassword(password);
-  const avatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}`;
-
-  const newUserRecord = {
-    id: newUserId,
-    email: cleanEmail,
-    name: cleanName,
-    passwordHash,
-    avatar,
-    authProvider: 'email',
-    createdAt: new Date().toISOString()
-  };
-
-  users.push(newUserRecord);
-  saveUsersRegistry(users);
-
-  const sessionUser = {
-    id: newUserId,
-    email: cleanEmail,
-    name: cleanName,
-    avatar,
-    authProvider: 'email',
-    isCloud: false
-  };
-
-  setActiveUserSession(sessionUser);
-  return { success: true, user: sessionUser, isNew: true };
-};
-
-const generateUUID = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
+  return { success: false, error: 'Database service is unavailable.' };
 };
 
 /**
- * Sign in with Google (OAuth)
+ * Genuine Google OAuth Sign-in Redirect
  */
-export const signInWithGoogle = async (googleProfile = null) => {
-  const cleanEmail = (googleProfile?.email || 'anshulnimore.26@gmail.com').trim().toLowerCase();
-  const isAnshul = cleanEmail === 'anshulnimore.26@gmail.com';
-  const name = googleProfile?.name || (isAnshul ? 'Anshul Singh' : cleanEmail.split('@')[0]);
+export const signInWithGoogle = async () => {
+  if (supabase && isSupabaseConfigured()) {
+    try {
+      const redirectUrl = typeof window !== 'undefined' ? window.location.origin : undefined;
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl
+        }
+      });
 
-  // If Anshul's personal Google account, map directly to Supabase auth user UUID
-  const userId = isAnshul ? '80b27bdc-dfb0-4b2f-8b22-b45613aea5ca' : generateUUID();
-  const avatar = googleProfile?.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}&backgroundColor=4285F4`;
+      if (error) {
+        return { success: false, error: error.message };
+      }
 
-  const users = getUsersRegistry();
-  let existingUser = users.find(u => u.email.toLowerCase() === cleanEmail);
-
-  if (!existingUser) {
-    existingUser = {
-      id: userId,
-      email: cleanEmail,
-      name,
-      avatar,
-      authProvider: 'google',
-      createdAt: new Date().toISOString()
-    };
-    users.push(existingUser);
-    saveUsersRegistry(users);
+      return { success: true, redirecting: true, url: data?.url };
+    } catch (e) {
+      return { success: false, error: e.message || 'Google OAuth failed to initialize.' };
+    }
   }
 
-  const sessionUser = {
-    id: existingUser.id || userId,
-    email: existingUser.email || cleanEmail,
-    name: existingUser.name || name,
-    avatar: existingUser.avatar || avatar,
-    authProvider: 'google',
-    isCloud: true
-  };
-
-  setActiveUserSession(sessionUser);
-  return { success: true, user: sessionUser };
+  return { success: false, error: 'Cloud database is not connected.' };
 };
 
 /**
  * Sign Out
  */
-export const signOutUser = async () => {
-  if (supabase) {
+export const signOut = async () => {
+  if (supabase && isSupabaseConfigured()) {
     try {
       await supabase.auth.signOut();
     } catch (e) {
-      console.error('Supabase sign out error:', e);
+      console.warn('Supabase sign-out error:', e);
     }
   }
   setActiveUserSession(null);
   return { success: true };
 };
+
+export const signOutUser = signOut;

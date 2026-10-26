@@ -248,9 +248,20 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // Handle Sign Out cleanly
+  const handleSignOut = async () => {
+    await signOutUser();
+    setUser(null);
+    setApplications([]);
+    setIsAuthModalOpen(false);
+    showToast('Signed out of your account.');
+  };
+
   // When user signs in, changes, or signs out, switch to their personal isolated vault
   useEffect(() => {
     let isMounted = true;
+    if (!user) return;
+
     const userKey = getUserStorageKey(user);
 
     const syncUserVault = async () => {
@@ -259,20 +270,13 @@ export default function App() {
         const localUserData = localStorage.getItem(userKey);
         if (localUserData && isMounted) {
           setApplications(JSON.parse(localUserData));
-        } else if (!user && isMounted) {
-          const guestSaved = localStorage.getItem('careertrack_apps_guest') || localStorage.getItem(LOCAL_STORAGE_KEY);
-          setApplications(guestSaved ? JSON.parse(guestSaved) : INITIAL_APPLICATIONS);
-        } else if (user && isMounted) {
-          // If brand new user with no saved data, initialize personal starting vault
-          setApplications(INITIAL_APPLICATIONS);
-          localStorage.setItem(userKey, JSON.stringify(INITIAL_APPLICATIONS));
         }
       } catch (e) {
         console.error('Failed to load user cache:', e);
       }
 
-      // 2. Fetch latest records from Supabase cloud database if configured
-      if (user && supabase) {
+      // 2. Fetch latest records from Supabase cloud database
+      if (supabase) {
         try {
           const { data, error } = await supabase
             .from('applications')
@@ -284,6 +288,22 @@ export default function App() {
             const loaded = data.map(mapFromDb);
             setApplications(loaded);
             localStorage.setItem(userKey, JSON.stringify(loaded));
+          } else if (user.email === 'anshulnimore.26@gmail.com' && (!data || data.length === 0)) {
+            // Anshul's fixed cloud vault backup check
+            const { data: anshulData } = await supabase
+              .from('applications')
+              .select('*')
+              .eq('user_id', '80b27bdc-dfb0-4b2f-8b22-b45613aea5ca')
+              .order('applied_date', { ascending: false });
+            if (anshulData && anshulData.length > 0 && isMounted) {
+              const loaded = anshulData.map(mapFromDb);
+              setApplications(loaded);
+              localStorage.setItem(userKey, JSON.stringify(loaded));
+            }
+          } else if (isMounted && !localStorage.getItem(userKey)) {
+            // New user starts with clean empty personal vault
+            setApplications([]);
+            localStorage.setItem(userKey, JSON.stringify([]));
           }
         } catch (err) {
           console.warn('Supabase fetch error:', err);
@@ -524,17 +544,6 @@ export default function App() {
     });
   };
 
-  const handleSignOut = async () => {
-    await signOutUser();
-    setUser(null);
-    try {
-      const guestSaved = localStorage.getItem('careertrack_apps_guest');
-      setApplications(guestSaved ? JSON.parse(guestSaved) : INITIAL_APPLICATIONS);
-    } catch {
-      setApplications(INITIAL_APPLICATIONS);
-    }
-    showToast('Signed out. Switched to guest workspace.');
-  };
 
   // Export Data to JSON
   const handleExportData = () => {
@@ -621,6 +630,28 @@ export default function App() {
     setEditingApp(app);
     setIsModalOpen(true);
   };
+
+  // If user is not authenticated, render the dedicated Authentication Gate (No Guest Access)
+  if (!user) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
+        <AuthModal
+          isGate={true}
+          isOpen={true}
+          onClose={() => {}}
+          onAuthSuccess={(loggedInUser) => {
+            setUser(loggedInUser);
+            setIsAuthModalOpen(false);
+          }}
+          showToast={showToast}
+          user={null}
+          onSignOut={handleSignOut}
+          applicationsCount={0}
+        />
+        <Toast toast={toast} onClose={() => setToast(null)} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 20px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
