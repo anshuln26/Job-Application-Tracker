@@ -176,6 +176,14 @@ export default function App() {
   const [user, setUser] = useState(() => getActiveUser());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [isRecoveryMode, setIsRecoveryMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      return hash.includes('type=recovery') || search.includes('type=recovery');
+    }
+    return false;
+  });
 
   // Load Applications from LocalStorage based on active user or guest
   const [applications, setApplications] = useState(() => {
@@ -226,12 +234,42 @@ export default function App() {
   // Sync Auth State with authService & Supabase
   useEffect(() => {
     const unsubscribe = onAuthStateChange((currentUser) => {
-      setUser(currentUser);
+      if (!isRecoveryMode) {
+        setUser(currentUser);
+      }
     });
 
     if (supabase) {
+      // 1. Listen for Supabase auth events (specifically PASSWORD_RECOVERY)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setIsRecoveryMode(true);
+          setIsAuthModalOpen(true);
+        } else if (event === 'SIGNED_IN' && !isRecoveryMode) {
+          if (session?.user) {
+            const userObj = {
+              id: session.user.id,
+              email: session.user.email,
+              name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
+              avatar: session.user.user_metadata?.avatar_url,
+              authProvider: 'email',
+              isCloud: true
+            };
+            setUser(userObj);
+          }
+        } else if (event === 'SIGNED_OUT') {
+          setUser(null);
+        }
+      });
+
+      // 2. Initial session check on load
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user && !getActiveUser()) {
+        const hash = typeof window !== 'undefined' ? window.location.hash : '';
+        const search = typeof window !== 'undefined' ? window.location.search : '';
+        const isRec = hash.includes('type=recovery') || search.includes('type=recovery');
+        if (isRec) {
+          setIsRecoveryMode(true);
+        } else if (session?.user && !getActiveUser()) {
           const userObj = {
             id: session.user.id,
             email: session.user.email,
@@ -243,10 +281,15 @@ export default function App() {
           setUser(userObj);
         }
       });
+
+      return () => {
+        unsubscribe();
+        subscription?.unsubscribe();
+      };
     }
 
     return () => unsubscribe();
-  }, []);
+  }, [isRecoveryMode]);
 
   // Handle Sign Out cleanly
   const handleSignOut = async () => {
@@ -631,20 +674,22 @@ export default function App() {
     setIsModalOpen(true);
   };
 
-  // If user is not authenticated, render the dedicated Authentication Gate (No Guest Access)
-  if (!user) {
+  // If user is not authenticated OR in recovery mode, render the dedicated Authentication Gate (No Guest Access)
+  if (!user || isRecoveryMode) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
         <AuthModal
           isGate={true}
           isOpen={true}
-          onClose={() => {}}
+          isRecoveryMode={isRecoveryMode}
+          onClose={() => setIsRecoveryMode(false)}
           onAuthSuccess={(loggedInUser) => {
             setUser(loggedInUser);
+            setIsRecoveryMode(false);
             setIsAuthModalOpen(false);
           }}
           showToast={showToast}
-          user={null}
+          user={user}
           onSignOut={handleSignOut}
           applicationsCount={0}
         />
@@ -770,9 +815,14 @@ export default function App() {
       {/* Clean Consumer Authentication Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
+        isRecoveryMode={isRecoveryMode}
+        onClose={() => {
+          setIsAuthModalOpen(false);
+          setIsRecoveryMode(false);
+        }}
         onAuthSuccess={(loggedInUser) => {
           setUser(loggedInUser);
+          setIsRecoveryMode(false);
           setIsAuthModalOpen(false);
         }}
         showToast={showToast}

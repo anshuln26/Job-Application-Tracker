@@ -12,7 +12,9 @@ import {
   CheckCircle2,
   KeyRound,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  ExternalLink,
+  Info
 } from 'lucide-react';
 import {
   signInWithEmail,
@@ -21,6 +23,7 @@ import {
   verifySignupCode,
   requestPasswordReset,
   verifyAndResetPassword,
+  updateUserPassword,
   signInWithGoogle
 } from '../lib/authService';
 
@@ -32,10 +35,19 @@ export default function AuthModal({
   user,
   onSignOut,
   applicationsCount = 0,
-  isGate = false
+  isGate = false,
+  isRecoveryMode = false
 }) {
-  // Mode: 'login' | 'signup' | 'verify_signup' | 'forgot_password' | 'reset_password'
-  const [mode, setMode] = useState('login');
+  // Mode: 'login' | 'signup' | 'verify_signup' | 'forgot_password' | 'email_link_sent' | 'reset_password_otp' | 'recovery_set_password' | 'google_setup_help'
+  const [mode, setMode] = useState(isRecoveryMode ? 'recovery_set_password' : 'login');
+  const [prevRecoveryMode, setPrevRecoveryMode] = useState(isRecoveryMode);
+
+  if (isRecoveryMode !== prevRecoveryMode) {
+    setPrevRecoveryMode(isRecoveryMode);
+    if (isRecoveryMode) {
+      setMode('recovery_set_password');
+    }
+  }
 
   // Form Fields
   const [name, setName] = useState('');
@@ -47,9 +59,8 @@ export default function AuthModal({
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
-  // 6-Digit OTP State
+  // 6-Digit OTP State (Only entered by user from email, NEVER displayed on screen)
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [activeOtpCode, setActiveOtpCode] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
 
   // Status
@@ -73,21 +84,20 @@ export default function AuthModal({
 
   // Focus first OTP box when entering verification mode
   useEffect(() => {
-    if ((mode === 'verify_signup' || mode === 'reset_password') && otpInputRefs.current[0]) {
+    if ((mode === 'verify_signup' || mode === 'reset_password_otp') && otpInputRefs.current[0]) {
       setTimeout(() => {
         otpInputRefs.current[0]?.focus();
       }, 100);
     }
   }, [mode]);
 
-  if (!isOpen && !isGate) return null;
+  if (!isOpen && !isGate && !isRecoveryMode) return null;
 
   // Handle OTP digit change with auto-focus
   const handleOtpChange = (index, value) => {
-    // Only accept numeric characters
     const cleanVal = value.replace(/\D/g, '');
     
-    // Support paste of multi-digit code
+    // Support paste of 6-digit code from email
     if (cleanVal.length > 1) {
       const digits = cleanVal.slice(0, 6).split('');
       const newOtp = [...otp];
@@ -132,13 +142,11 @@ export default function AuthModal({
       } else {
         if (res.unconfirmed) {
           setErrorMsg(res.error);
-          // Offer instant transition to email verification
           setEmail(res.email || email);
-          const newCode = await resendVerificationCode(res.email || email, 'signup');
-          setActiveOtpCode(newCode.code);
+          await resendVerificationCode(res.email || email, 'signup');
           setResendCooldown(30);
           setMode('verify_signup');
-          setInfoMsg('Enter the 6-digit code below to confirm and activate your account.');
+          setInfoMsg('Please enter the 6-digit code received in your email inbox.');
         } else {
           setErrorMsg(res.error || 'Invalid email or password.');
         }
@@ -170,11 +178,10 @@ export default function AuthModal({
     try {
       const res = await signUpWithEmail(name, email, password);
       if (res.success && res.requiresVerification) {
-        setActiveOtpCode(res.code);
         setOtp(['', '', '', '', '', '']);
         setResendCooldown(30);
         setMode('verify_signup');
-        setInfoMsg(`We've sent a 6-digit verification code to ${email}.`);
+        setInfoMsg(`We've dispatched a 6-digit verification code to ${email}. Check your email.`);
       } else if (res.success && res.user) {
         showToast?.(`Account created! Welcome, ${res.user.name}.`);
         onAuthSuccess(res.user);
@@ -194,7 +201,7 @@ export default function AuthModal({
     e?.preventDefault();
     const fullCode = otp.join('');
     if (fullCode.length !== 6) {
-      setErrorMsg('Please enter all 6 digits of the verification code.');
+      setErrorMsg('Please enter all 6 digits of the code from your email.');
       return;
     }
 
@@ -209,7 +216,6 @@ export default function AuthModal({
         if (res.user) {
           onAuthSuccess(res.user);
         } else {
-          // If needs login
           setMode('login');
           setInfoMsg('Email verified! You can now log in with your credentials.');
         }
@@ -239,27 +245,25 @@ export default function AuthModal({
     try {
       const res = await requestPasswordReset(email);
       if (res.success) {
-        setActiveOtpCode(res.code);
         setOtp(['', '', '', '', '', '']);
         setResendCooldown(30);
-        setMode('reset_password');
-        setInfoMsg(`Enter the 6-digit recovery code sent to ${email}.`);
+        setMode('email_link_sent');
       } else {
-        setErrorMsg(res.error || 'Failed to dispatch reset code.');
+        setErrorMsg(res.error || 'Failed to dispatch reset email.');
       }
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to send recovery code.');
+      setErrorMsg(err.message || 'Failed to send recovery email.');
     } finally {
       setLoading(false);
     }
   };
 
-  // 5. Submit Password Reset (Step 2)
-  const handleResetPassword = async (e) => {
+  // 5. Submit Password Reset via 6-Digit OTP (Step 2 - Manual Code)
+  const handleResetPasswordOtp = async (e) => {
     e.preventDefault();
     const fullCode = otp.join('');
     if (fullCode.length !== 6) {
-      setErrorMsg('Please enter the 6-digit verification code.');
+      setErrorMsg('Please enter the 6-digit code received in your email.');
       return;
     }
     if (newPassword !== confirmNewPassword) {
@@ -288,10 +292,46 @@ export default function AuthModal({
           setInfoMsg('Password updated! Please log in with your new password.');
         }
       } else {
-        setErrorMsg(res.error || 'Invalid verification code or reset failed.');
+        setErrorMsg(res.error || 'Invalid 6-digit code from email.');
       }
     } catch (err) {
       setErrorMsg(err.message || 'Failed to reset password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 6. Submit Password Reset via Email Link (Step 2 - Recovery URL Link)
+  const handleRecoveryLinkPasswordSet = async (e) => {
+    e.preventDefault();
+    if (newPassword !== confirmNewPassword) {
+      setErrorMsg('Passwords do not match.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setErrorMsg('Password must be at least 6 characters.');
+      return;
+    }
+
+    setErrorMsg('');
+    setLoading(true);
+
+    try {
+      const res = await updateUserPassword(newPassword);
+      if (res.success) {
+        showToast?.('Password securely updated! Welcome back.');
+        if (typeof window !== 'undefined' && window.history) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        if (res.user) {
+          onAuthSuccess(res.user);
+        }
+        onClose?.();
+      } else {
+        setErrorMsg(res.error || 'Failed to update password.');
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Error updating password.');
     } finally {
       setLoading(false);
     }
@@ -301,40 +341,36 @@ export default function AuthModal({
   const handleResendCode = async () => {
     if (resendCooldown > 0) return;
     setErrorMsg('');
-    setInfoMsg('Sending new verification code...');
+    setInfoMsg('Sending new verification email...');
 
     try {
       const res = await resendVerificationCode(
         email,
-        mode === 'reset_password' ? 'recovery' : 'signup'
+        mode === 'reset_password_otp' ? 'recovery' : 'signup'
       );
       if (res.success) {
-        setActiveOtpCode(res.code);
         setResendCooldown(30);
-        setInfoMsg(`New 6-digit code dispatched to ${email}.`);
-        showToast?.('New 6-digit verification code sent!');
+        setInfoMsg(`New verification email dispatched to ${email}. Check your inbox.`);
+        showToast?.('Verification email sent!');
       }
     } catch (err) {
-      setErrorMsg(err.message || 'Failed to resend code.');
+      setErrorMsg(err.message || 'Failed to resend email.');
     }
   };
 
-  // Genuine Google OAuth Sign-in Redirect
+  // Genuine Google OAuth Sign-in with Pre-flight Protection
   const handleGoogleOAuth = async () => {
     setErrorMsg('');
     setLoading(true);
     try {
       const res = await signInWithGoogle();
       if (!res.success) {
-        if (res.error?.includes('provider is not enabled')) {
-          setErrorMsg(
-            'Google OAuth provider requires Google Client ID in Supabase dashboard. Please use Email & Password with 6-digit verification below.'
-          );
+        if (res.needsConfig) {
+          setMode('google_setup_help');
         } else {
           setErrorMsg(res.error || 'Google OAuth failed to initialize.');
         }
       }
-      // If success, browser redirects automatically
     } catch (err) {
       setErrorMsg(err.message || 'Google OAuth error.');
     } finally {
@@ -342,8 +378,8 @@ export default function AuthModal({
     }
   };
 
-  // If user is already logged in and opens profile dialog
-  if (user && !isGate) {
+  // Profile Dialog for already logged-in user
+  if (user && !isGate && !isRecoveryMode) {
     return (
       <div
         style={{
@@ -537,7 +573,7 @@ export default function AuthModal({
       >
         {/* Top Bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-          {mode === 'verify_signup' || mode === 'forgot_password' || mode === 'reset_password' ? (
+          {mode !== 'login' && mode !== 'signup' ? (
             <button
               type="button"
               className="btn btn-ghost btn-icon"
@@ -555,7 +591,7 @@ export default function AuthModal({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <ShieldCheck size={18} style={{ color: 'var(--primary)' }} />
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Secure Auth
+                Secure Vault
               </span>
             </div>
           )}
@@ -962,44 +998,15 @@ export default function AuthModal({
               <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
                 Verify Your Email
               </h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
-                Enter the 6-digit verification code sent to <br />
-                <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                We've sent a 6-digit verification code to <br />
+                <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>.<br />
+                Please check your email inbox and enter the code below.
               </p>
             </div>
 
-            {/* Simulated / Fallback Verification Banner */}
-            {activeOtpCode && (
-              <div
-                style={{
-                  background: 'rgba(99, 102, 241, 0.08)',
-                  border: '1px dashed var(--primary)',
-                  borderRadius: '10px',
-                  padding: '10px 14px',
-                  textAlign: 'center',
-                  marginBottom: '20px'
-                }}
-              >
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  Security Verification Code Dispatched:
-                </div>
-                <div
-                  style={{
-                    fontSize: '1.25rem',
-                    fontWeight: 800,
-                    letterSpacing: '6px',
-                    color: 'var(--primary)',
-                    fontFamily: 'monospace',
-                    marginTop: '2px'
-                  }}
-                >
-                  {activeOtpCode}
-                </div>
-              </div>
-            )}
-
             <form onSubmit={handleVerifySignup}>
-              {/* 6-Digit Boxes */}
+              {/* 6-Digit Boxes - Zero code leakage */}
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '22px' }}>
                 {otp.map((digit, idx) => (
                   <input
@@ -1064,21 +1071,21 @@ export default function AuthModal({
                 }}
               >
                 <RefreshCw size={12} className={resendCooldown > 0 ? 'animate-spin' : ''} />
-                {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend Code'}
+                {resendCooldown > 0 ? `Resend email in ${resendCooldown}s` : 'Resend Email'}
               </button>
             </div>
           </div>
         )}
 
-        {/* ----------------- MODE: FORGOT PASSWORD ----------------- */}
+        {/* ----------------- MODE: FORGOT PASSWORD (STEP 1) ----------------- */}
         {mode === 'forgot_password' && (
           <div>
             <div style={{ textAlign: 'center', marginBottom: '22px' }}>
               <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
                 Reset Your Password
               </h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-                Enter your account email to receive a 6-digit verification code.
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                Enter your account email to receive a secure password reset email.
               </p>
             </div>
 
@@ -1107,7 +1114,7 @@ export default function AuthModal({
                 disabled={loading}
                 style={{ width: '100%', height: '44px', fontSize: '0.925rem', fontWeight: 700, borderRadius: '10px' }}
               >
-                {loading ? 'Sending Code...' : 'Send 6-Digit Code'}
+                {loading ? 'Sending Instructions...' : 'Send Password Reset Email'}
               </button>
             </form>
 
@@ -1123,49 +1130,85 @@ export default function AuthModal({
           </div>
         )}
 
-        {/* ----------------- MODE: RESET PASSWORD (STEP 2) ----------------- */}
-        {mode === 'reset_password' && (
+        {/* ----------------- MODE: EMAIL SENT CONFIRMATION ----------------- */}
+        {mode === 'email_link_sent' && (
+          <div style={{ textAlign: 'center', padding: '10px 0' }}>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                background: 'rgba(52, 168, 83, 0.15)',
+                color: '#34A853',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px'
+              }}
+            >
+              <CheckCircle2 size={32} />
+            </div>
+
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
+              Reset Email Dispatched!
+            </h3>
+
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '22px' }}>
+              We've dispatched a secure password reset email to: <br />
+              <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>.<br />
+              Check your inbox and click the <strong>Reset Password</strong> link to set your new password.
+            </p>
+
+            <div style={{ background: 'var(--bg-surface-hover)', borderRadius: '10px', padding: '12px 14px', marginBottom: '20px', textAlign: 'left', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                <Info size={14} style={{ color: 'var(--primary)' }} /> Received a 6-digit recovery code?
+              </div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
+                If your email contains a 6-digit numeric token instead of a clickable link, you can enter it directly.
+              </p>
+              <button
+                type="button"
+                onClick={() => setMode('reset_password_otp')}
+                style={{
+                  marginTop: '8px',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: 'var(--primary)',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+              >
+                Enter 6-digit code manually →
+              </button>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => setMode('login')}
+              style={{ width: '100%', height: '42px', fontWeight: 600 }}
+            >
+              Back to Sign In
+            </button>
+          </div>
+        )}
+
+        {/* ----------------- MODE: RESET PASSWORD VIA 6-DIGIT CODE ----------------- */}
+        {mode === 'reset_password_otp' && (
           <div>
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
               <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
                 Enter Code & New Password
               </h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
-                Verification code sent to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                Enter the 6-digit code sent to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>
               </p>
             </div>
 
-            {activeOtpCode && (
-              <div
-                style={{
-                  background: 'rgba(99, 102, 241, 0.08)',
-                  border: '1px dashed var(--primary)',
-                  borderRadius: '10px',
-                  padding: '8px 12px',
-                  textAlign: 'center',
-                  marginBottom: '16px'
-                }}
-              >
-                <div style={{ fontSize: '0.725rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  Security Verification Code:
-                </div>
-                <div
-                  style={{
-                    fontSize: '1.2rem',
-                    fontWeight: 800,
-                    letterSpacing: '6px',
-                    color: 'var(--primary)',
-                    fontFamily: 'monospace',
-                    marginTop: '2px'
-                  }}
-                >
-                  {activeOtpCode}
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleResetPassword}>
-              {/* 6-Digit Boxes */}
+            <form onSubmit={handleResetPasswordOtp}>
+              {/* 6-Digit Boxes - Zero code leakage */}
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', marginBottom: '16px' }}>
                 {otp.map((digit, idx) => (
                   <input
@@ -1281,6 +1324,187 @@ export default function AuthModal({
                 {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
               </button>
             </div>
+          </div>
+        )}
+
+        {/* ----------------- MODE: SET NEW PASSWORD (FROM EMAIL RECOVERY LINK) ----------------- */}
+        {mode === 'recovery_set_password' && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '22px' }}>
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  background: 'rgba(52, 168, 83, 0.15)',
+                  color: '#34A853',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '12px'
+                }}
+              >
+                <Lock size={26} />
+              </div>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
+                Set New Password
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+                Verified via your email reset link. Choose your new password.
+              </p>
+            </div>
+
+            <form onSubmit={handleRecoveryLinkPasswordSet}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                  New Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Min 6 characters"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', paddingRight: '40px', height: '42px', fontSize: '0.9rem' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                  Confirm New Password
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Repeat new password"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    className="form-input"
+                    style={{ paddingLeft: '38px', height: '42px', fontSize: '0.9rem' }}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={loading}
+                style={{ width: '100%', height: '44px', fontSize: '0.925rem', fontWeight: 700, borderRadius: '10px' }}
+              >
+                {loading ? 'Saving Password...' : 'Save Password & Enter Vault'}
+              </button>
+
+              <div style={{ textAlign: 'center', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined' && window.history) {
+                      window.history.replaceState(null, '', window.location.pathname);
+                    }
+                    setMode('login');
+                    setErrorMsg('');
+                  }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--text-muted)', fontSize: '0.8rem', cursor: 'pointer' }}
+                >
+                  Cancel and Back to Sign In
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* ----------------- MODE: GOOGLE SETUP GUIDANCE ----------------- */}
+        {mode === 'google_setup_help' && (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  background: 'rgba(234, 67, 53, 0.12)',
+                  color: '#EA4335',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: '12px'
+                }}
+              >
+                <svg width="26" height="26" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"/>
+                  <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                  <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                </svg>
+              </div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)' }}>
+                Google OAuth Activation Required
+              </h3>
+              <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                In your Supabase project (<strong>qajgoopmdnntxdebsqob</strong>), Google provider requires OAuth credentials.
+              </p>
+            </div>
+
+            <div style={{ background: 'var(--bg-surface-hover)', borderRadius: '12px', padding: '14px', marginBottom: '18px', border: '1px solid var(--border-color)', fontSize: '0.8rem' }}>
+              <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                Quick 2-Minute Setup in Supabase:
+              </div>
+              <ol style={{ paddingLeft: '18px', margin: 0, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                <li>Create an OAuth 2.0 Client ID in Google Cloud Console.</li>
+                <li>Set Authorized Redirect URI to:<br />
+                  <code style={{ fontSize: '0.725rem', background: 'var(--bg-base)', padding: '2px 4px', borderRadius: '4px', wordBreak: 'break-all' }}>
+                    https://qajgoopmdnntxdebsqob.supabase.co/auth/v1/callback
+                  </code>
+                </li>
+                <li>In Supabase Dashboard → <strong>Authentication</strong> → <strong>Providers</strong> → <strong>Google</strong>: Toggle ON and paste your Client ID & Secret.</li>
+              </ol>
+            </div>
+
+            <a
+              href="https://supabase.com/dashboard/project/qajgoopmdnntxdebsqob/auth/providers"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary"
+              style={{ width: '100%', height: '42px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 600, marginBottom: '10px' }}
+            >
+              <span>Open Supabase Auth Providers</span>
+              <ExternalLink size={14} />
+            </a>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setMode('login');
+                setErrorMsg('');
+              }}
+              style={{ width: '100%', height: '42px', fontSize: '0.85rem', fontWeight: 700 }}
+            >
+              Sign In with Email & Password
+            </button>
           </div>
         )}
       </div>
