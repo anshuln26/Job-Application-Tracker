@@ -10,7 +10,6 @@ import {
   Moon,
   Download,
   Upload,
-  RotateCcw,
   Search,
   Scale,
   Archive,
@@ -538,9 +537,6 @@ export default function Navbar({
             style={{ display: 'none' }}
           />
 
-          <button className="btn btn-secondary btn-icon" onClick={onResetData} title="Reset Sample Data">
-            <RotateCcw size={18} />
-          </button>
         </div>
 
       </div>

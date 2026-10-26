@@ -837,7 +837,7 @@ export default function AuthModal({
                   }}
                 >
                   <User size={14} />
-                  <span>Continue as Guest (No account needed) &rarr;</span>
+                  <span>Enter as Guest User (Try without an account) &rarr;</span>
                 </button>
               </div>
             )}
@@ -1040,7 +1040,7 @@ export default function AuthModal({
                   }}
                 >
                   <User size={14} />
-                  <span>Continue as Guest (No account needed) &rarr;</span>
+                  <span>Enter as Guest User (Try without an account) &rarr;</span>
                 </button>
               </div>
             )}

@@ -14,7 +14,6 @@ import AuthModal from './components/AuthModal';
 import ArchivedModal from './components/ArchivedModal';
 import Footer from './components/Footer';
 import PendingAlertBanner from './components/PendingAlertBanner';
-import { INITIAL_APPLICATIONS } from './data/mockData';
 import { supabase } from './lib/supabaseClient';
 import { getActiveUser, setActiveUserSession, signOutUser, onAuthStateChange } from './lib/authService';
 
@@ -191,8 +190,21 @@ const getUserStorageKey = (u) => {
 };
 
 export default function App() {
-  // User Auth State
-  const [user, setUser] = useState(() => getActiveUser() || GUEST_USER);
+  // User Auth State: null if unauthenticated, object if signed in
+  const [user, setUser] = useState(() => {
+    const active = getActiveUser();
+    if (active && !active.isGuest) return active;
+    if (typeof window !== 'undefined' && sessionStorage.getItem('careertrack_guest_entered') === 'true') {
+      return GUEST_USER;
+    }
+    return null;
+  });
+  const [isGuestMode, setIsGuestMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem('careertrack_guest_entered') === 'true';
+    }
+    return false;
+  });
   const prevUserRef = useRef(user);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
@@ -205,13 +217,16 @@ export default function App() {
     return false;
   });
 
-  // Load Applications from LocalStorage based on active user
+  // Load Applications: always start at 0 (empty board) for guest or fresh users
   const [applications, setApplications] = useState(() => {
     try {
       const active = getActiveUser();
       if (!active || active.isGuest) {
-        const guestSaved = localStorage.getItem('careertrack_apps_guest_temp');
-        return guestSaved ? JSON.parse(guestSaved) : [];
+        if (typeof window !== 'undefined' && sessionStorage.getItem('careertrack_guest_entered') === 'true') {
+          const guestSaved = sessionStorage.getItem('careertrack_apps_guest_temp');
+          return guestSaved ? JSON.parse(guestSaved) : [];
+        }
+        return [];
       }
       const userKey = getUserStorageKey(active);
       const saved = localStorage.getItem(userKey);
@@ -277,14 +292,25 @@ export default function App() {
               authProvider: session.user.app_metadata?.provider || 'email',
               isCloud: true
             };
+            if (typeof window !== 'undefined') {
+              sessionStorage.removeItem('careertrack_guest_entered');
+              sessionStorage.removeItem('careertrack_apps_guest_temp');
+            }
             setActiveUserSession(userObj);
             setUser(userObj);
+            setIsGuestMode(false);
+            setIsAuthModalOpen(false);
           }
         } else if (event === 'SIGNED_OUT') {
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('careertrack_guest_entered');
+            sessionStorage.removeItem('careertrack_apps_guest_temp');
+          }
+          setIsGuestMode(false);
           setActiveUserSession(null);
-          setUser(GUEST_USER);
+          setUser(null);
           setApplications([]);
-          setIsAuthModalOpen(true);
+          setIsAuthModalOpen(false);
         }
       });
 
@@ -304,8 +330,13 @@ export default function App() {
             authProvider: session.user.app_metadata?.provider || 'email',
             isCloud: true
           };
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('careertrack_guest_entered');
+            sessionStorage.removeItem('careertrack_apps_guest_temp');
+          }
           setActiveUserSession(userObj);
           setUser(userObj);
+          setIsGuestMode(false);
         }
       });
 
@@ -321,19 +352,30 @@ export default function App() {
   // Handle Sign Out cleanly
   const handleSignOut = async () => {
     await signOutUser();
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('careertrack_guest_entered');
+      sessionStorage.removeItem('careertrack_apps_guest_temp');
+    }
+    setIsGuestMode(false);
     setActiveUserSession(null);
-    setUser(GUEST_USER);
+    setUser(null);
     setApplications([]);
-    setIsAuthModalOpen(true);
+    setIsAuthModalOpen(false);
     showToast('Signed out successfully.', 'info');
   };
 
   const handleContinueAsGuest = () => {
+    setIsGuestMode(true);
     setUser(GUEST_USER);
-    const guestSaved = localStorage.getItem('careertrack_apps_guest_temp');
-    setApplications(guestSaved ? JSON.parse(guestSaved) : []);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('careertrack_guest_entered', 'true');
+      const guestSaved = sessionStorage.getItem('careertrack_apps_guest_temp');
+      setApplications(guestSaved ? JSON.parse(guestSaved) : []);
+    } else {
+      setApplications([]);
+    }
     setIsAuthModalOpen(false);
-    showToast('Browsing as Guest. Changes will NOT be saved to the cloud.', 'warning');
+    showToast('Entered as Guest User. Changes will NOT be saved to the cloud.', 'warning');
   };
 
   // When user signs in, changes, or signs out, switch to their personal isolated vault
@@ -432,9 +474,19 @@ export default function App() {
     };
   }, [user]);
 
-  // Sync LocalStorage whenever applications change for active user
+  // Sync Storage whenever applications change
   useEffect(() => {
-    if (!user || user.isGuest) return;
+    if (!user) return;
+    if (user.isGuest) {
+      try {
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('careertrack_apps_guest_temp', JSON.stringify(applications));
+        }
+      } catch (e) {
+        console.error('Failed to save guest temp applications:', e);
+      }
+      return;
+    }
     if (prevUserRef.current?.email !== user.email) {
       prevUserRef.current = user;
       return;
@@ -722,11 +774,11 @@ export default function App() {
         }
       }
     } else if (confirmState.type === 'reset') {
-      setApplications(INITIAL_APPLICATIONS);
+      setApplications([]);
       if (user && !user.isGuest) {
         localStorage.removeItem(getUserStorageKey(user));
       }
-      showToast('Reset sample data to initial state.', 'info');
+      showToast('Cleared all applications.', 'info');
     }
     setConfirmState({ isOpen: false, type: '', id: null, title: '', message: '' });
   };
@@ -852,6 +904,30 @@ export default function App() {
     );
   }
 
+  // 2. Authentication Gate: Require user to authenticate or enter as guest first
+  if (!user && !isGuestMode) {
+    return (
+      <div style={{ minHeight: '100vh', background: 'var(--bg-base)' }}>
+        <AuthModal
+          isGate={true}
+          isOpen={true}
+          isRecoveryMode={false}
+          onContinueAsGuest={handleContinueAsGuest}
+          onAuthSuccess={(loggedInUser) => {
+            setUser(loggedInUser);
+            setIsGuestMode(false);
+            setIsAuthModalOpen(false);
+          }}
+          showToast={showToast}
+          user={null}
+          onSignOut={handleSignOut}
+          applicationsCount={0}
+        />
+        <Toast toast={toast} onClose={() => setToast(null)} />
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: '1600px', margin: '0 auto', padding: '0 20px', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       
@@ -867,7 +943,7 @@ export default function App() {
         onExportData={handleExportData}
         onImportData={handleImportData}
         onResetData={handleResetData}
-        user={user}
+        user={user || GUEST_USER}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onSignOut={handleSignOut}
         archivedCount={archivedApplications.length}
@@ -933,26 +1009,6 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {applications.length === 0 && (
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => {
-                  setApplications(INITIAL_APPLICATIONS);
-                  showToast('Loaded sample demo jobs into guest view.', 'info');
-                }}
-                style={{
-                  fontSize: '0.825rem',
-                  fontWeight: 600,
-                  padding: '8px 14px',
-                  gap: '6px'
-                }}
-                title="Load sample demo jobs to preview how the board and analytics work"
-              >
-                <Sparkles size={14} />
-                Load Sample Demo Data
-              </button>
-            )}
             <button
               className="btn btn-primary"
               onClick={() => setIsAuthModalOpen(true)}
