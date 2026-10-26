@@ -156,7 +156,7 @@ export default function PendingAlertBanner({ applications, onSelectApp, onUpdate
                   📝 {needsTailoringCount} pending resume tailoring for JD
                 </span>
               )}
-              <span style={{ color: 'var(--text-secondary)' }}>Review and submit your applications before opportunities close!</span>
+              <span style={{ color: 'var(--text-secondary)' }}>Upcoming deadline spotlight from your active Wishlist & Referrals on the board</span>
             </p>
           </div>
         </div>

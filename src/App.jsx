@@ -398,7 +398,7 @@ export default function App() {
           // Legacy data auto-migration for Anshul (HPE intern, Stripe SDE intern, etc. from pre-auth local storage)
           if (userEmail === 'anshulnimore.26@gmail.com') {
             try {
-              const legacyRaw = localStorage.getItem('careertrack_apps_v1') || localStorage.getItem('careertrack_apps_guest');
+              const legacyRaw = localStorage.getItem('careertrack_apps_v1');
               if (legacyRaw) {
                 const legacyApps = JSON.parse(legacyRaw);
                 if (Array.isArray(legacyApps) && legacyApps.length > 0) {
@@ -412,6 +412,7 @@ export default function App() {
                     cloudApps = [...toMigrate, ...cloudApps];
                   }
                 }
+                localStorage.removeItem('careertrack_apps_v1');
               }
             } catch (migErr) {
               console.warn('Legacy migration check notice:', migErr);
@@ -481,21 +482,24 @@ export default function App() {
   const handleSaveApplication = async (appData) => {
     setApplications(prev => {
       const exists = prev.some(a => a.id === appData.id);
-      if (exists) {
-        showToast(
-          user?.isGuest
-            ? `Updated ${appData.company} (Guest Mode - Not saved to cloud)`
-            : `Updated application for ${appData.company}`
-        );
-        return prev.map(a => a.id === appData.id ? appData : a);
-      } else {
-        showToast(
-          user?.isGuest
-            ? `Added ${appData.company} (Guest Mode - Not saved to cloud)`
-            : `Added application for ${appData.company}`
-        );
-        return [appData, ...prev];
+      const next = exists
+        ? prev.map(a => a.id === appData.id ? appData : a)
+        : [appData, ...prev];
+
+      if (user && !user.isGuest) {
+        try {
+          localStorage.setItem(getUserStorageKey(user), JSON.stringify(next));
+        } catch (e) {
+          console.error('Local cache error:', e);
+        }
       }
+
+      showToast(
+        user?.isGuest
+          ? `${exists ? 'Updated' : 'Added'} ${appData.company} (Guest Mode - Not saved to cloud)`
+          : `${exists ? 'Updated' : 'Added'} application for ${appData.company}`
+      );
+      return next;
     });
 
     if (user && !user.isGuest && supabase) {
@@ -509,34 +513,42 @@ export default function App() {
   };
 
   const handleUpdateStatus = async (id, newStatus) => {
-    let updatedTimeline = [];
-    setApplications(prev => prev.map(app => {
-      if (app.id === id) {
-        updatedTimeline = [
-          ...(app.timeline || []),
-          {
-            id: 't-' + Date.now(),
-            stage: `Moved to ${newStatus}`,
-            date: new Date().toISOString().split('T')[0],
-            notes: `Status updated via board/table.`
-          }
-        ];
-        return { ...app, status: newStatus, timeline: updatedTimeline };
+    const targetApp = applications.find(a => a.id === id);
+    const nowIso = new Date().toISOString();
+    const updatedTimeline = [
+      ...(targetApp?.timeline || []),
+      {
+        id: 't-' + Date.now(),
+        stage: `Moved to ${newStatus}`,
+        date: nowIso.split('T')[0],
+        notes: `Status updated via board/table.`
       }
-      return app;
-    }));
+    ];
+
+    setApplications(prev => {
+      const next = prev.map(app => app.id === id ? { ...app, status: newStatus, timeline: updatedTimeline } : app);
+      if (user && !user.isGuest) {
+        try {
+          localStorage.setItem(getUserStorageKey(user), JSON.stringify(next));
+        } catch (e) {
+          console.error('Local cache error:', e);
+        }
+      }
+      return next;
+    });
     showToast(`Status updated!`);
 
-    if (user && !user.isGuest && supabase) {
+    if (user && !user.isGuest && supabase && id) {
       try {
-        await supabase
+        const { error } = await supabase
           .from('applications')
           .update({
             status: newStatus,
             timeline: updatedTimeline,
-            updated_at: new Date().toISOString()
+            updated_at: nowIso
           })
           .eq('id', id);
+        if (error) console.error('Supabase update status error:', error);
       } catch (err) {
         console.error('Supabase update status error:', err);
       }
@@ -566,12 +578,23 @@ export default function App() {
   };
 
   const handleBulkStatusUpdate = async (ids, newStatus) => {
-    setApplications(prev => prev.map(a => ids.includes(a.id) ? { ...a, status: newStatus } : a));
+    setApplications(prev => {
+      const next = prev.map(a => ids.includes(a.id) ? { ...a, status: newStatus } : a);
+      if (user && !user.isGuest) {
+        try {
+          localStorage.setItem(getUserStorageKey(user), JSON.stringify(next));
+        } catch (e) {
+          console.error('Local cache error:', e);
+        }
+      }
+      return next;
+    });
     showToast(`Updated status for ${ids.length} applications.`);
 
-    if (user && !user.isGuest && supabase) {
+    if (user && !user.isGuest && supabase && ids.length > 0) {
       try {
-        await supabase.from('applications').update({ status: newStatus }).in('id', ids);
+        const { error } = await supabase.from('applications').update({ status: newStatus }).in('id', ids);
+        if (error) console.error('Supabase bulk status error:', error);
       } catch (err) {
         console.error('Supabase bulk status error:', err);
       }
@@ -580,22 +603,29 @@ export default function App() {
 
   // Restore archived application back to board
   const handleRestoreApplication = async (id) => {
-    let restoredApp = null;
     setApplications(prev => {
-      const updated = prev.map(a => {
-        if (a.id === id) {
-          restoredApp = { ...a, archived: false, archivedAt: null };
-          return restoredApp;
+      const next = prev.map(a => a.id === id ? { ...a, archived: false, archivedAt: null } : a);
+      if (user && !user.isGuest) {
+        try {
+          localStorage.setItem(getUserStorageKey(user), JSON.stringify(next));
+        } catch (e) {
+          console.error('Local cache error:', e);
         }
-        return a;
-      });
-      return updated;
+      }
+      return next;
     });
     showToast('Application restored back to board!');
 
-    if (user && !user.isGuest && supabase && restoredApp) {
+    if (user && !user.isGuest && supabase && id) {
       try {
-        await supabase.from('applications').upsert(mapToDb(restoredApp, user));
+        const { error } = await supabase
+          .from('applications')
+          .update({
+            archived: false,
+            archived_at: null
+          })
+          .eq('id', id);
+        if (error) console.error('Supabase restore error:', error);
       } catch (err) {
         console.warn('Supabase restore sync error:', err);
       }
@@ -604,15 +634,30 @@ export default function App() {
 
   // Restore all archived applications
   const handleRestoreAllArchived = async () => {
-    setApplications(prev => prev.map(a => a.archived ? { ...a, archived: false, archivedAt: null } : a));
+    const archivedIds = applications.filter(a => a.archived).map(a => a.id);
+    setApplications(prev => {
+      const next = prev.map(a => a.archived ? { ...a, archived: false, archivedAt: null } : a);
+      if (user && !user.isGuest) {
+        try {
+          localStorage.setItem(getUserStorageKey(user), JSON.stringify(next));
+        } catch (e) {
+          console.error('Local cache error:', e);
+        }
+      }
+      return next;
+    });
     showToast('All archived applications restored back to active board!');
 
-    if (user && !user.isGuest && supabase) {
+    if (user && !user.isGuest && supabase && archivedIds.length > 0) {
       try {
-        const rows = applications.filter(a => a.archived).map(a => mapToDb({ ...a, archived: false, archivedAt: null }, user));
-        if (rows.length > 0) {
-          await supabase.from('applications').upsert(rows);
-        }
+        const { error } = await supabase
+          .from('applications')
+          .update({
+            archived: false,
+            archived_at: null
+          })
+          .in('id', archivedIds);
+        if (error) console.error('Supabase restore all error:', error);
       } catch (err) {
         console.warn('Supabase restore all sync error:', err);
       }
@@ -623,32 +668,59 @@ export default function App() {
     const now = new Date().toISOString();
 
     if (confirmState.type === 'archive_one' || confirmState.type === 'delete_one') {
-      let targetArchived = null;
-      setApplications(prev => prev.map(a => {
-        if (a.id === confirmState.id) {
-          targetArchived = { ...a, archived: true, archivedAt: now };
-          return targetArchived;
+      const targetId = confirmState.id;
+      setApplications(prev => {
+        const next = prev.map(a => a.id === targetId ? { ...a, archived: true, archivedAt: now } : a);
+        if (user && !user.isGuest) {
+          try {
+            localStorage.setItem(getUserStorageKey(user), JSON.stringify(next));
+          } catch (e) {
+            console.error('Local cache error:', e);
+          }
         }
-        return a;
-      }));
+        return next;
+      });
       showToast('Application moved to Archive.');
 
-      if (user && !user.isGuest && supabase && targetArchived) {
+      if (user && !user.isGuest && supabase && targetId) {
         try {
-          await supabase.from('applications').upsert(mapToDb(targetArchived, user));
+          const { error } = await supabase
+            .from('applications')
+            .update({
+              archived: true,
+              archived_at: now
+            })
+            .eq('id', targetId);
+          if (error) console.error('Supabase archive error:', error);
         } catch (err) {
           console.warn('Supabase archive sync error:', err);
         }
       }
     } else if (confirmState.type === 'archive_bulk' || confirmState.type === 'delete_bulk') {
       const ids = Array.isArray(confirmState.id) ? confirmState.id : [confirmState.id];
-      setApplications(prev => prev.map(a => ids.includes(a.id) ? { ...a, archived: true, archivedAt: now } : a));
+      setApplications(prev => {
+        const next = prev.map(a => ids.includes(a.id) ? { ...a, archived: true, archivedAt: now } : a);
+        if (user && !user.isGuest) {
+          try {
+            localStorage.setItem(getUserStorageKey(user), JSON.stringify(next));
+          } catch (e) {
+            console.error('Local cache error:', e);
+          }
+        }
+        return next;
+      });
       showToast(`${ids.length} applications moved to Archive.`);
 
-      if (user && !user.isGuest && supabase) {
+      if (user && !user.isGuest && supabase && ids.length > 0) {
         try {
-          const rows = applications.filter(a => ids.includes(a.id)).map(a => mapToDb({ ...a, archived: true, archivedAt: now }, user));
-          await supabase.from('applications').upsert(rows);
+          const { error } = await supabase
+            .from('applications')
+            .update({
+              archived: true,
+              archived_at: now
+            })
+            .in('id', ids);
+          if (error) console.error('Supabase bulk archive error:', error);
         } catch (err) {
           console.warn('Supabase bulk archive sync error:', err);
         }

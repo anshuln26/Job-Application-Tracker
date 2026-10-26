@@ -82,25 +82,81 @@ export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus,
   };
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(6, minmax(290px, 1fr))',
-      gap: '16px',
-      overflowX: 'auto',
-      paddingBottom: '16px',
-      alignItems: 'start'
-    }}>
-      {STAGES.map((stage) => {
-        const StageIcon = ICON_MAP[stage.icon] || Bookmark;
-        const stageApps = applications.filter(a => a.status === stage.id);
-        const isHovered = dragOverStage === stage.id;
+    <div>
+      {/* Quick Stage Jump Navigation bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        overflowX: 'auto',
+        padding: '2px 4px 14px 4px',
+        scrollbarWidth: 'none'
+      }}>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0, marginRight: '4px' }}>
+          Board Stages:
+        </span>
+        {STAGES.map(stage => {
+          const count = applications.filter(a => a.status === stage.id).length;
+          return (
+            <button
+              key={stage.id}
+              onClick={() => {
+                const el = document.getElementById(`kanban-stage-${stage.id}`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 12px',
+                borderRadius: '16px',
+                fontSize: '0.78rem',
+                fontWeight: 600,
+                border: count > 0 ? `1px solid ${stage.color}` : '1px solid var(--border-color)',
+                background: count > 0 ? stage.bg : 'var(--bg-surface)',
+                color: count > 0 ? stage.color : 'var(--text-secondary)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.15s ease'
+              }}
+              title={`Jump to ${stage.label}`}
+            >
+              <span>{stage.label}</span>
+              <span style={{
+                background: count > 0 ? stage.color : 'rgba(255, 255, 255, 0.1)',
+                color: count > 0 ? '#fff' : 'var(--text-muted)',
+                borderRadius: '10px',
+                padding: '0 6px',
+                fontSize: '0.7rem',
+                fontWeight: 700
+              }}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-        return (
-          <div
-            key={stage.id}
-            onDragOver={(e) => handleDragOver(e, stage.id)}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDrop(e, stage.id)}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(6, minmax(280px, 1fr))',
+        gap: '16px',
+        overflowX: 'auto',
+        paddingBottom: '16px',
+        alignItems: 'start'
+      }}>
+        {STAGES.map((stage) => {
+          const StageIcon = ICON_MAP[stage.icon] || Bookmark;
+          const stageApps = applications.filter(a => a.status === stage.id);
+          const isHovered = dragOverStage === stage.id;
+
+          return (
+            <div
+              key={stage.id}
+              id={`kanban-stage-${stage.id}`}
+              onDragOver={(e) => handleDragOver(e, stage.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, stage.id)}
             style={{
               background: isHovered ? 'var(--bg-surface-hover)' : 'var(--bg-column)',
               border: isHovered ? `2px dashed ${stage.color}` : '1px solid var(--border-color)',
@@ -630,6 +686,7 @@ export default function KanbanBoard({ applications, onSelectApp, onUpdateStatus,
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

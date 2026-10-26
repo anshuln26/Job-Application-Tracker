@@ -10,6 +10,7 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
   const pendingApplyCount = applications.filter(a => a.status === 'wishlist' || a.status === 'referral').length;
   const interviewingCount = applications.filter(a => a.status === 'interviewing').length;
   const offerCount = applications.filter(a => a.status === 'offer').length;
+  const rejectedCount = applications.filter(a => a.status === 'rejected').length;
   
   // Calculate Response Rate (Interviewing + Offer) / Applied * 100
   const responseRate = appliedCount > 0 
@@ -98,7 +99,7 @@ export default function StatsOverview({ applications, displayCurrency = 'INR', o
           </div>
         </div>
         <div style={{ marginTop: '12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-          {appliedCount} submitted · <span style={{ color: pendingApplyCount > 0 ? 'var(--status-interview)' : 'inherit', fontWeight: 600 }}>{pendingApplyCount} pending to apply</span>
+          {appliedCount} submitted{rejectedCount > 0 && <span style={{ color: 'var(--status-rejected)', fontWeight: 600 }}> ({rejectedCount} rejected)</span>} · <span style={{ color: pendingApplyCount > 0 ? 'var(--status-interview)' : 'inherit', fontWeight: 600 }}>{pendingApplyCount} pending to apply</span>
         </div>
       </div>
 
