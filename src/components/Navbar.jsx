@@ -13,7 +13,7 @@ import {
   RotateCcw,
   Search,
   Scale,
-  Database,
+  Archive,
   LogIn,
   LogOut
 } from 'lucide-react';
@@ -31,9 +31,10 @@ export default function Navbar({
   onResetData,
   totalApps,
   user,
-  isConfigured,
   onOpenAuthModal,
   onSignOut,
+  archivedCount = 0,
+  onOpenArchiveModal,
   displayCurrency = 'INR',
   setDisplayCurrency
 }) {
@@ -228,18 +229,51 @@ export default function Navbar({
             <Plus size={18} /> New Job
           </button>
 
-          {/* Supabase Cloud Connection & Auth Status */}
+          {/* Archived Applications Button */}
+          {archivedCount > 0 && (
+            <button
+              className="btn btn-secondary"
+              onClick={onOpenArchiveModal}
+              title={`View ${archivedCount} archived applications`}
+              style={{ height: '40px', gap: '6px', fontSize: '0.825rem' }}
+            >
+              <Archive size={15} />
+              <span>Archive</span>
+              <span
+                style={{
+                  fontSize: '0.7rem',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  background: 'var(--bg-surface-hover)',
+                  border: '1px solid var(--border-color)',
+                  fontWeight: 700
+                }}
+              >
+                {archivedCount}
+              </span>
+            </button>
+          )}
+
+          {/* User Profile & Auth Status */}
           {user ? (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
               <button
                 className="btn btn-secondary"
                 onClick={onOpenAuthModal}
-                title={`Logged in as ${user.email}. Click to view account & database settings.`}
+                title={`Signed in as ${user.email}. Click to view account profile.`}
                 style={{ height: '40px', gap: '8px', fontSize: '0.825rem', borderTopRightRadius: '4px', borderBottomRightRadius: '4px' }}
               >
-                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--status-offer)' }} />
-                <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {user.email ? user.email.split('@')[0] : 'User'}
+                {user.avatar ? (
+                  <img
+                    src={user.avatar}
+                    alt=""
+                    style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--status-offer)' }} />
+                )}
+                <span style={{ maxWidth: '110px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                  {user.name || user.email.split('@')[0]}
                 </span>
               </button>
               <button
@@ -248,7 +282,7 @@ export default function Navbar({
                   e.stopPropagation();
                   onSignOut();
                 }}
-                title="Sign out of personal vault"
+                title="Sign out of account"
                 style={{ height: '40px', width: '34px', borderTopLeftRadius: '4px', borderBottomLeftRadius: '4px', color: 'var(--text-muted)' }}
               >
                 <LogOut size={13} />
@@ -258,11 +292,11 @@ export default function Navbar({
             <button
               className="btn btn-secondary"
               onClick={onOpenAuthModal}
-              title={isConfigured ? 'Sign in to Supabase Cloud' : 'Configure Supabase Database'}
-              style={{ height: '40px', gap: '6px', fontSize: '0.825rem' }}
+              title="Sign in or create a personal account"
+              style={{ height: '40px', gap: '6px', fontSize: '0.825rem', fontWeight: 600 }}
             >
-              {isConfigured ? <LogIn size={15} /> : <Database size={15} />}
-              <span>{isConfigured ? 'Cloud Sync' : 'Cloud Setup'}</span>
+              <LogIn size={15} />
+              <span>Sign In</span>
             </button>
           )}
 

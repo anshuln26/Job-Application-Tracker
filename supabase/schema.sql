@@ -42,6 +42,8 @@ ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS referral_linkedin TEXT;
 ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS referral_date DATE;
 ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS resume_curation TEXT DEFAULT 'not_needed';
 ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS salary_undisclosed BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
 
 -- 3. RLS Policies: Ensure users can only access their own data
 DROP POLICY IF EXISTS "Users can view their own applications" ON public.applications;

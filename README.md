@@ -133,8 +133,23 @@ A modern, cloud-synced career management platform designed for global software e
 
 ---
 
-### ☁️ 11. Dual-Mode Cloud Sync & Offline Architecture
-- **Cloud Mode**: Real-time cloud sync with Supabase PostgreSQL, email/password authentication, and Row Level Security (RLS).
+### 🔐 11. Consumer SaaS Authentication & Google OAuth
+- **Consumer-Grade Auth Experience**: Clean, intuitive modal featuring separate **Sign In** and **Create Account** flows.
+- **Continue with Google**: Modern Google-based OAuth authentication with secure encryption, alongside standard email and password authentication.
+- **Strict Data & Profile Isolation**: Every user receives an isolated profile and database vault with unique namespaces (`usr_...`, `goog_...`). Personal job applications, notes, resumes, and timelines are 100% private and protected.
+- **Zero Technical Friction**: Removed technical database settings and cloud configuration prompts from the end-user interface.
+
+---
+
+### 📦 12. Soft-Delete Application Archiving (Zero Data Loss)
+- **Safe Archival System**: When deleting any job application, the data is **never permanently deleted**. It is safely moved to the **Archived Applications** vault.
+- **Quick-Access Archive Vault**: Navbar features a dynamic `Archive` button with a real-time badge count whenever archived records exist.
+- **Full History & Restoration**: Search and inspect archived applications, view archived timestamps, and restore any job (or all archived jobs) back to the active board with one click (`🔄 Restore to Board`).
+
+---
+
+### ☁️ 13. Dual-Mode Cloud Sync & Offline Architecture
+- **Cloud Mode**: Real-time cloud sync with Supabase PostgreSQL, GoTrue / Google OAuth authentication, and Row Level Security (RLS).
 - **Offline / Local Mode**: 100% functional without an account or internet connection using browser `localStorage`.
 - **Zero-Loss Migration**: JSON import/export functionality for effortless data portability and backups.
 - **Forward-Compatible Metadata Engine**: Custom metadata serialization (`<!-- CT_META: ... :CT_META -->`) ensures all global fields persist cleanly to PostgreSQL text fields without requiring destructive database schema alterations.
@@ -164,6 +179,7 @@ The cloud database is powered by Supabase PostgreSQL with strict Row Level Secur
   * `user_id` (`UUID NOT NULL REFERENCES auth.users`): Foreign key linked to authenticated user.
   * `company`, `title`, `location`, `work_type`, `status`, `priority`
   * `salary_min`, `salary_max`, `currency`, `applied_date`, `job_url`
+  * `archived` (`BOOLEAN`), `archived_at` (`TIMESTAMPTZ`) (safe soft-deletion)
   * `contact_name`, `contact_email`, `resume_version`
   * `tags` (`JSONB`), `timeline` (`JSONB`), `interviews` (`JSONB`), `notes` (`TEXT`)
   * `created_at`, `updated_at` (automatic trigger via `handle_updated_at()`)

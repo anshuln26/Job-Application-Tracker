@@ -1,26 +1,15 @@
 import React, { useState } from 'react';
 import {
   X,
-  Lock,
   Mail,
-  UserPlus,
-  LogIn,
-  Database,
-  AlertCircle,
-  CheckCircle2,
-  RefreshCw,
-  ShieldCheck,
+  Lock,
   User,
-  LogOut,
-  UploadCloud,
-  ExternalLink
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ShieldCheck
 } from 'lucide-react';
-import {
-  supabase,
-  getSupabaseConfig,
-  updateSupabaseCredentials,
-  testSupabaseConnection
-} from '../lib/supabaseClient';
+import { signInWithEmail, signUpWithEmail, signInWithGoogle } from '../lib/authService';
 
 export default function AuthModal({
   isOpen,
@@ -29,119 +18,254 @@ export default function AuthModal({
   showToast,
   user,
   onSignOut,
-  onSyncToCloud,
   applicationsCount = 0
 }) {
-  const [activeTab, setActiveTab] = useState('auth'); // 'auth' | 'database'
-  const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'local_profile'
-  
-  // Auth Form State
+  const [mode, setMode] = useState('login'); // 'login' | 'signup'
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [localProfileName, setLocalProfileName] = useState('Anshul (Personal)');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Database Settings State
-  const [dbUrl, setDbUrl] = useState(() => getSupabaseConfig().url);
-  const [dbKey, setDbKey] = useState(() => getSupabaseConfig().anonKey);
-  const [testingDb, setTestingDb] = useState(false);
-  const [dbTestResult, setDbTestResult] = useState(null);
-
   if (!isOpen) return null;
 
-  const handleTestDatabase = async () => {
-    setTestingDb(true);
-    setDbTestResult(null);
-    try {
-      const result = await testSupabaseConnection(dbUrl, dbKey);
-      setDbTestResult(result);
-      if (result.success) {
-        showToast(result.message);
-      } else {
-        showToast(result.message, 'error');
-      }
-    } catch (err) {
-      setDbTestResult({
-        success: false,
-        message: err.message || 'Connection test failed.'
-      });
-    } finally {
-      setTestingDb(false);
-    }
-  };
+  // If user is already logged in, show their profile management card
+  if (user) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '16px'
+        }}
+        onClick={onClose}
+      >
+        <div
+          className="glass-panel animate-fade-in"
+          style={{
+            width: '100%',
+            maxWidth: '460px',
+            background: 'var(--bg-surface)',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
+            border: '1px solid var(--border-color)',
+            padding: '28px'
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Close button */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+            <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ width: '32px', height: '32px' }}>
+              <X size={18} />
+            </button>
+          </div>
 
-  const handleSaveDbSettings = (e) => {
-    e.preventDefault();
-    if (!dbUrl || !dbKey) {
-      showToast('Please provide both Supabase URL and Key', 'error');
-      return;
-    }
-    updateSupabaseCredentials(dbUrl, dbKey);
-    showToast('Supabase database configuration updated! Reloading client...');
-    setTimeout(() => {
-      handleTestDatabase();
-    }, 300);
-  };
+          {/* User Profile Avatar & Header */}
+          <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+            <div
+              style={{
+                width: '72px',
+                height: '72px',
+                borderRadius: '50%',
+                background: user.authProvider === 'google'
+                  ? 'linear-gradient(135deg, #4285F4, #34A853)'
+                  : 'linear-gradient(135deg, var(--accent-primary), #8B5CF6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 14px auto',
+                color: '#fff',
+                fontSize: '1.75rem',
+                fontWeight: 800,
+                boxShadow: '0 6px 20px var(--accent-glow)'
+              }}
+            >
+              {user.avatar ? (
+                <img
+                  src={user.avatar}
+                  alt={user.name || user.email}
+                  style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+                />
+              ) : (
+                (user.name || user.email || 'U')[0].toUpperCase()
+              )}
+            </div>
 
-  const handleSubmitAuth = async (e) => {
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>
+              {user.name || user.email.split('@')[0]}
+            </h3>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0 }}>
+              {user.email}
+            </p>
+
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '10px' }}>
+              {user.authProvider === 'google' ? (
+                <span
+                  style={{
+                    background: 'rgba(66, 133, 244, 0.12)',
+                    border: '1px solid rgba(66, 133, 244, 0.3)',
+                    color: '#4285F4',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    padding: '2px 10px',
+                    borderRadius: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <span>Google Account</span>
+                </span>
+              ) : (
+                <span
+                  style={{
+                    background: 'rgba(16, 185, 129, 0.12)',
+                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                    color: '#10B981',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    padding: '2px 10px',
+                    borderRadius: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <ShieldCheck size={12} /> Email Verified
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Account Metrics Card */}
+          <div
+            style={{
+              background: 'var(--bg-surface-hover)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-color)',
+              padding: '16px',
+              marginBottom: '20px',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '12px',
+              textAlign: 'center'
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Saved Applications</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
+                {applicationsCount}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Data Privacy</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--status-offer)', marginTop: '6px' }}>
+                Isolated Vault
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={onClose}
+              style={{ height: '42px', fontSize: '0.9rem', justifyContent: 'center' }}
+            >
+              Continue to My Workspace
+            </button>
+            <button
+              className="btn"
+              onClick={() => {
+                onSignOut();
+                onClose();
+              }}
+              style={{
+                height: '42px',
+                fontSize: '0.9rem',
+                justifyContent: 'center',
+                background: 'rgba(239, 68, 68, 0.1)',
+                color: '#EF4444',
+                border: '1px solid rgba(239, 68, 68, 0.25)'
+              }}
+            >
+              Sign Out of Account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle Form Submission (Sign In or Sign Up)
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (mode === 'local_profile') {
-      const trimmedName = localProfileName.trim() || 'Personal User';
-      const localUser = {
-        id: 'local-' + trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '-'),
-        email: `${trimmedName.toLowerCase().replace(/[^a-z0-9]/g, '')}@local.vault`,
-        user_metadata: { name: trimmedName },
-        isLocal: true
-      };
-      onAuthSuccess(localUser);
-      showToast(`Switched to private local vault: ${trimmedName}`);
-      onClose();
-      return;
-    }
-
-    if (!supabase) {
-      setErrorMsg('Supabase client is not initialized. Please verify Database Settings.');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      if (mode === 'signup') {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
-        if (error) throw error;
-        if (data?.user && !data.session) {
-          showToast('Sign up successful! Please check your email to confirm your account.', 'info');
-        } else {
-          showToast('Account created and signed in successfully!');
-          onAuthSuccess(data.user);
-        }
+    if (mode === 'signup') {
+      if (password !== confirmPassword) {
+        setErrorMsg('Passwords do not match. Please verify your password.');
+        return;
+      }
+      if (password.length < 6) {
+        setErrorMsg('Password must be at least 6 characters long.');
+        return;
+      }
+      setLoading(true);
+      const res = await signUpWithEmail(name, email, password);
+      setLoading(false);
+      if (res.success) {
+        showToast(`Welcome to CareerTrack Pro, ${res.user.name}!`);
+        onAuthSuccess(res.user);
         onClose();
       } else {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        showToast('Signed in successfully! Applications synced to your private vault.');
-        onAuthSuccess(data.user);
+        setErrorMsg(res.error || 'Failed to create account.');
+      }
+    } else {
+      setLoading(true);
+      const res = await signInWithEmail(email, password);
+      setLoading(false);
+      if (res.success) {
+        showToast(`Welcome back, ${res.user.name}!`);
+        onAuthSuccess(res.user);
         onClose();
+      } else {
+        setErrorMsg(res.error || 'Invalid email or password.');
+      }
+    }
+  };
+
+  // Handle Google OAuth
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      const res = await signInWithGoogle();
+      setLoading(false);
+      if (res.success) {
+        if (!res.redirecting && res.user) {
+          showToast(`Signed in with Google as ${res.user.name}!`);
+          onAuthSuccess(res.user);
+          onClose();
+        }
+      } else {
+        setErrorMsg(res.error || 'Google authentication failed.');
       }
     } catch (err) {
-      const msg = err.message || 'Authentication failed.';
-      if (msg.includes('fetch failed') || msg.includes('Failed to fetch') || msg.includes('ENOTFOUND')) {
-        setErrorMsg('Cannot reach Supabase host. Your project domain may be paused or unreachable. Switch to Database Settings tab to check.');
-      } else {
-        setErrorMsg(msg);
-      }
-    } finally {
       setLoading(false);
+      setErrorMsg(err.message || 'Google authentication encountered an error.');
     }
   };
 
@@ -158,7 +282,7 @@ export default function AuthModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1200,
+        zIndex: 1000,
         padding: '16px'
       }}
       onClick={onClose}
@@ -167,485 +291,286 @@ export default function AuthModal({
         className="glass-panel animate-fade-in"
         style={{
           width: '100%',
-          maxWidth: '520px',
-          padding: '24px',
+          maxWidth: '440px',
           background: 'var(--bg-surface)',
-          position: 'relative',
           borderRadius: 'var(--radius-lg)',
-          boxShadow: 'var(--shadow-lg)',
-          maxHeight: '92vh',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          boxShadow: '0 24px 60px rgba(0, 0, 0, 0.6)',
+          border: '1px solid var(--border-color)',
+          padding: '32px'
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, var(--accent-primary), #8B5CF6)',
+        {/* Modal Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '22px' }}>
+          <div>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 6px 0', color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+              {mode === 'login' ? 'Welcome Back' : 'Create an Account'}
+            </h2>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: 0 }}>
+              {mode === 'login'
+                ? 'Sign in to access your personal job application tracker.'
+                : 'Start tracking job applications with your isolated personal vault.'}
+            </p>
+          </div>
+          <button className="btn btn-ghost btn-icon" onClick={onClose} style={{ width: '32px', height: '32px' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Error Feedback */}
+        {errorMsg && (
+          <div
+            style={{
+              background: 'rgba(239, 68, 68, 0.12)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#EF4444',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              fontSize: '0.825rem',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              color: '#fff',
-              boxShadow: '0 4px 12px var(--accent-glow)'
-            }}>
-              {activeTab === 'database' ? <Database size={20} /> : <ShieldCheck size={20} />}
-            </div>
+              gap: '8px',
+              marginBottom: '18px'
+            }}
+          >
+            <AlertCircle size={16} style={{ flexShrink: 0 }} />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {/* Google OAuth Button */}
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          disabled={loading}
+          style={{
+            width: '100%',
+            height: '46px',
+            background: 'var(--bg-surface-hover)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '12px',
+            color: 'var(--text-primary)',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.05)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#4285F4';
+            e.currentTarget.style.background = 'var(--bg-surface)';
+            e.currentTarget.style.boxShadow = '0 4px 14px rgba(66, 133, 244, 0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--border-color)';
+            e.currentTarget.style.background = 'var(--bg-surface-hover)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.05)';
+          }}
+        >
+          {/* Official Google G Logo */}
+          <svg width="18" height="18" viewBox="0 0 24 24">
+            <path
+              fill="#4285F4"
+              d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"
+            />
+            <path
+              fill="#34A853"
+              d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+            />
+            <path
+              fill="#FBBC05"
+              d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+            />
+            <path
+              fill="#EA4335"
+              d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+            />
+          </svg>
+          <span>Continue with Google</span>
+        </button>
+
+        {/* Divider */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            margin: '20px 0',
+            color: 'var(--text-muted)',
+            fontSize: '0.75rem',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em'
+          }}
+        >
+          <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+          <span style={{ padding: '0 12px' }}>or continue with email</span>
+          <div style={{ flex: 1, height: '1px', background: 'var(--border-color)' }} />
+        </div>
+
+        {/* Email & Password Form */}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {mode === 'signup' && (
             <div>
-              <h2 style={{ fontSize: '1.2rem', fontWeight: 800 }}>
-                {user ? 'Personal User Vault' : (activeTab === 'database' ? 'Database Configuration' : 'User Authentication & Cloud Vault')}
-              </h2>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                {user ? 'Your job search data is saved strictly for your account' : 'Sign in to access your personal application database'}
-              </p>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                Full Name
+              </label>
+              <div style={{ position: 'relative' }}>
+                <User size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Anshul Sharma"
+                  className="form-input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  style={{ paddingLeft: '36px', height: '42px', fontSize: '0.875rem' }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+              Email Address
+            </label>
+            <div style={{ position: 'relative' }}>
+              <Mail size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="email"
+                required
+                placeholder="name@example.com"
+                className="form-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={{ paddingLeft: '36px', height: '42px', fontSize: '0.875rem' }}
+              />
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="btn btn-ghost btn-icon"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            <X size={20} />
-          </button>
-        </div>
 
-        {/* Tab Switcher */}
-        <div style={{
-          display: 'flex',
-          background: 'var(--bg-surface-hover)',
-          borderRadius: '10px',
-          padding: '4px',
-          marginBottom: '18px',
-          border: '1px solid var(--border-color)',
-          gap: '4px'
-        }}>
-          <button
-            type="button"
-            className={`btn ${activeTab === 'auth' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ flex: 1, padding: '7px 12px', fontSize: '0.82rem', justifyContent: 'center' }}
-            onClick={() => setActiveTab('auth')}
-          >
-            <User size={15} /> {user ? 'My Account' : 'User Authentication'}
-          </button>
-          <button
-            type="button"
-            className={`btn ${activeTab === 'database' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{ flex: 1, padding: '7px 12px', fontSize: '0.82rem', justifyContent: 'center' }}
-            onClick={() => setActiveTab('database')}
-          >
-            <Database size={15} /> Database & Cloud Settings
-          </button>
-        </div>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Password
+              </label>
+            </div>
+            <div style={{ position: 'relative' }}>
+              <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                placeholder="Enter password (min 6 chars)"
+                className="form-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ paddingLeft: '36px', paddingRight: '36px', height: '42px', fontSize: '0.875rem' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+          </div>
 
-        {/* Body Content */}
-        <div style={{ overflowY: 'auto', flex: 1, paddingRight: '2px' }}>
-          
-          {/* TAB 1: AUTH & USER VAULT */}
-          {activeTab === 'auth' && (
+          {mode === 'signup' && (
             <div>
-              {user ? (
-                /* Authenticated User Profile Card */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{
-                    background: 'var(--bg-surface-hover)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '18px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{
-                          width: '42px',
-                          height: '42px',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, var(--status-offer), #059669)',
-                          color: '#fff',
-                          fontWeight: 800,
-                          fontSize: '1.1rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center'
-                        }}>
-                          {(user.email || 'U')[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--text-primary)' }}>
-                            {user.email}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--status-offer)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <CheckCircle2 size={13} /> {user.isLocal ? 'Personal Local Vault' : 'Cloud PostgreSQL Vault Active'}
-                          </div>
-                        </div>
-                      </div>
-                      <span className="badge badge-offer" style={{ fontSize: '0.72rem' }}>
-                        {applicationsCount} Saved Apps
-                      </span>
-                    </div>
-
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5, borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                      🔒 <strong>Personal Data Isolation:</strong> All applications, salaries, interview notes, and contact details are saved specifically for your user ID (<code>{user.id.slice(0, 16)}...</code>). Other users cannot access your records.
-                    </div>
-                  </div>
-
-                  {/* Sync to Cloud Action (if local or cloud) */}
-                  {onSyncToCloud && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => {
-                        onSyncToCloud();
-                        showToast('Triggered cloud database synchronization!');
-                      }}
-                      style={{ justifyContent: 'center', gap: '8px', padding: '10px' }}
-                    >
-                      <UploadCloud size={16} /> Force Sync All Applications to Cloud Database
-                    </button>
-                  )}
-
-                  {/* Sign Out */}
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    onClick={() => {
-                      onSignOut();
-                      onClose();
-                    }}
-                    style={{ justifyContent: 'center', gap: '8px', padding: '10px' }}
-                  >
-                    <LogOut size={16} /> Sign Out of Personal Vault
-                  </button>
-                </div>
-              ) : (
-                /* Unauthenticated Sign In / Sign Up Form */
-                <div>
-                  {/* Mode switcher pills */}
-                  <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
-                    <button
-                      type="button"
-                      onClick={() => { setMode('login'); setErrorMsg(''); }}
-                      style={{
-                        flex: 1,
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        border: mode === 'login' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                        background: mode === 'login' ? 'var(--accent-primary)' : 'var(--bg-surface-hover)',
-                        color: mode === 'login' ? '#fff' : 'var(--text-secondary)',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Cloud Sign In
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setMode('signup'); setErrorMsg(''); }}
-                      style={{
-                        flex: 1,
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        border: mode === 'signup' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                        background: mode === 'signup' ? 'var(--accent-primary)' : 'var(--bg-surface-hover)',
-                        color: mode === 'signup' ? '#fff' : 'var(--text-secondary)',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Cloud Sign Up
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setMode('local_profile'); setErrorMsg(''); }}
-                      style={{
-                        flex: 1,
-                        padding: '6px 10px',
-                        borderRadius: '8px',
-                        border: mode === 'local_profile' ? '1px solid var(--accent-primary)' : '1px solid var(--border-color)',
-                        background: mode === 'local_profile' ? 'var(--accent-primary)' : 'var(--bg-surface-hover)',
-                        color: mode === 'local_profile' ? '#fff' : 'var(--text-secondary)',
-                        fontSize: '0.8rem',
-                        fontWeight: 600,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Local Vault
-                    </button>
-                  </div>
-
-                  {errorMsg && (
-                    <div style={{
-                      background: 'var(--status-rejected-bg)',
-                      border: '1px solid rgba(239, 68, 68, 0.3)',
-                      color: 'var(--status-rejected)',
-                      padding: '10px 14px',
-                      borderRadius: '8px',
-                      fontSize: '0.825rem',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '8px',
-                      marginBottom: '14px'
-                    }}>
-                      <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                      <div>
-                        <div>{errorMsg}</div>
-                        {errorMsg.includes('Supabase host') && (
-                          <button
-                            type="button"
-                            onClick={() => setActiveTab('database')}
-                            style={{
-                              marginTop: '6px',
-                              background: 'none',
-                              border: 'none',
-                              color: 'var(--accent-primary)',
-                              fontWeight: 700,
-                              fontSize: '0.78rem',
-                              cursor: 'pointer',
-                              padding: 0,
-                              textDecoration: 'underline'
-                            }}
-                          >
-                            Open Database Settings to check or update project URL ↗
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  <form onSubmit={handleSubmitAuth} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                    {mode === 'local_profile' ? (
-                      <div className="form-group">
-                        <label className="form-label">Profile / Vault Name</label>
-                        <div style={{ position: 'relative' }}>
-                          <input
-                            type="text"
-                            className="form-input"
-                            style={{ paddingLeft: '38px' }}
-                            placeholder="e.g. Anshul (Personal)"
-                            value={localProfileName}
-                            onChange={(e) => setLocalProfileName(e.target.value)}
-                            required
-                          />
-                          <User size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                        </div>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-                          Creates an isolated local database on this device that stores your job applications privately.
-                        </span>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="form-group">
-                          <label className="form-label">Email Address</label>
-                          <div style={{ position: 'relative' }}>
-                            <input
-                              type="email"
-                              className="form-input"
-                              style={{ paddingLeft: '38px' }}
-                              placeholder="you@domain.com"
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              required
-                            />
-                            <Mail size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                          </div>
-                        </div>
-
-                        <div className="form-group">
-                          <label className="form-label">Password</label>
-                          <div style={{ position: 'relative' }}>
-                            <input
-                              type="password"
-                              className="form-input"
-                              style={{ paddingLeft: '38px' }}
-                              placeholder="••••••••"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              minLength={6}
-                              required
-                            />
-                            <Lock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                          </div>
-                        </div>
-                      </>
-                    )}
-
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      style={{ width: '100%', marginTop: '6px', height: '42px', justifyContent: 'center' }}
-                      disabled={loading}
-                    >
-                      {loading ? (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <RefreshCw size={16} className="animate-spin" /> Authenticating...
-                        </span>
-                      ) : mode === 'login' ? (
-                        <>
-                          <LogIn size={16} /> Sign In to Personal Vault
-                        </>
-                      ) : mode === 'signup' ? (
-                        <>
-                          <UserPlus size={16} /> Create Personal Cloud Vault
-                        </>
-                      ) : (
-                        <>
-                          <ShieldCheck size={16} /> Open Isolated Local Vault
-                        </>
-                      )}
-                    </button>
-
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      justifyContent: 'center',
-                      fontSize: '0.75rem',
-                      color: 'var(--status-offer)',
-                      marginTop: '4px'
-                    }}>
-                      <CheckCircle2 size={14} />
-                      <span>Row Level Security (RLS) Encrypted & Protected</span>
-                    </div>
-                  </form>
-                </div>
-              )}
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)' }}>
+                Confirm Password
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder="Re-enter your password"
+                  className="form-input"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  style={{ paddingLeft: '36px', height: '42px', fontSize: '0.875rem' }}
+                />
+              </div>
             </div>
           )}
 
-          {/* TAB 2: DATABASE CONFIGURATION & DIAGNOSTICS */}
-          {activeTab === 'database' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              
-              {/* Connection Diagnostics Card */}
-              <div style={{
-                background: 'var(--bg-surface-hover)',
-                border: '1px solid var(--border-color)',
-                borderRadius: 'var(--radius-md)',
-                padding: '16px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, fontSize: '0.85rem' }}>
-                    <Database size={16} style={{ color: 'var(--accent-primary)' }} />
-                    <span>PostgreSQL Cloud Connection Status</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleTestDatabase}
-                    disabled={testingDb}
-                    className="btn btn-ghost"
-                    style={{ fontSize: '0.75rem', padding: '4px 8px', gap: '4px' }}
-                  >
-                    <RefreshCw size={13} className={testingDb ? 'animate-spin' : ''} />
-                    {testingDb ? 'Testing...' : 'Test Connection'}
-                  </button>
-                </div>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading}
+            style={{
+              height: '44px',
+              fontSize: '0.9rem',
+              fontWeight: 700,
+              justifyContent: 'center',
+              marginTop: '8px',
+              boxShadow: '0 4px 14px var(--accent-glow)'
+            }}
+          >
+            {loading ? 'Processing...' : mode === 'login' ? 'Sign In' : 'Create Free Account'}
+          </button>
+        </form>
 
-                {dbTestResult ? (
-                  <div style={{
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.8rem',
-                    background: dbTestResult.success ? 'var(--status-offer-bg)' : 'var(--status-rejected-bg)',
-                    color: dbTestResult.success ? 'var(--status-offer)' : 'var(--status-rejected)',
-                    border: `1px solid ${dbTestResult.success ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                    lineHeight: 1.4
-                  }}>
-                    <strong>{dbTestResult.success ? '🟢 Online: ' : '🔴 Connection Alert: '}</strong>
-                    {dbTestResult.message}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    Target: <code>{dbUrl || 'Not configured'}</code>. Click <strong>Test Connection</strong> to run live health check.
-                  </div>
-                )}
-              </div>
-
-              {/* Edit Database Credentials */}
-              <form onSubmit={handleSaveDbSettings} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                <div className="form-group">
-                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Supabase Project URL</span>
-                    <a
-                      href="https://supabase.com/dashboard"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: '0.72rem', color: 'var(--accent-primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                    >
-                      Supabase Dashboard <ExternalLink size={11} />
-                    </a>
-                  </label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="https://xyzproject.supabase.co"
-                    value={dbUrl}
-                    onChange={(e) => setDbUrl(e.target.value)}
-                    required
-                  />
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    Found under: <strong>Project Settings ➔ Configuration ➔ API ➔ Project URL</strong>
-                  </span>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Supabase Anon / Publishable Key</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                    value={dbKey}
-                    onChange={(e) => setDbKey(e.target.value)}
-                    required
-                  />
-                  <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                    Found under: <strong>Project Settings ➔ Configuration ➔ API ➔ anon / public API key</strong>
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    style={{ flex: 1, justifyContent: 'center' }}
-                  >
-                    Save Database Settings
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleTestDatabase}
-                    disabled={testingDb}
-                    className="btn btn-secondary"
-                    style={{ flex: 1, justifyContent: 'center', gap: '6px' }}
-                  >
-                    <RefreshCw size={14} className={testingDb ? 'animate-spin' : ''} />
-                    {testingDb ? 'Testing...' : 'Test Connection'}
-                  </button>
-                </div>
-              </form>
-
-              {/* SQL Schema Notice */}
-              <div style={{
-                background: 'var(--bg-main)',
-                border: '1px solid var(--border-color)',
-                borderRadius: '8px',
-                padding: '12px',
-                fontSize: '0.76rem',
-                color: 'var(--text-secondary)',
-                lineHeight: 1.5
-              }}>
-                📄 <strong>Database Schema Migration:</strong> If you are connecting a new project, copy the SQL migration script from <code style={{ color: 'var(--accent-primary)' }}>supabase/schema.sql</code> and execute it in your Supabase SQL Editor.
-              </div>
-
-            </div>
+        {/* Toggle Mode Footer */}
+        <div style={{ marginTop: '22px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+          {mode === 'login' ? (
+            <span>
+              Don't have an account?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('signup');
+                  setErrorMsg('');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent-primary)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                Sign up
+              </button>
+            </span>
+          ) : (
+            <span>
+              Already have an account?{' '}
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setErrorMsg('');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent-primary)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  padding: 0
+                }}
+              >
+                Log in
+              </button>
+            </span>
           )}
-
         </div>
-
       </div>
     </div>
   );

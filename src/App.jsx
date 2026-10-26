@@ -10,10 +10,12 @@ import JobModal from './components/JobModal';
 import Toast from './components/Toast';
 import ConfirmModal from './components/ConfirmModal';
 import AuthModal from './components/AuthModal';
+import ArchivedModal from './components/ArchivedModal';
 import Footer from './components/Footer';
 import PendingAlertBanner from './components/PendingAlertBanner';
 import { INITIAL_APPLICATIONS } from './data/mockData';
-import { supabase, isSupabaseConfigured } from './lib/supabaseClient';
+import { supabase } from './lib/supabaseClient';
+import { getActiveUser, signOutUser, onAuthStateChange } from './lib/authService';
 
 const LOCAL_STORAGE_KEY = 'careertrack_apps_v1';
 const THEME_KEY = 'careertrack_theme_v1';
@@ -32,6 +34,8 @@ const serializeNotesWithMeta = (notesText, meta = {}) => {
     salaryStocks: meta.salaryStocks || null,
     salaryUndisclosed: Boolean(meta.salaryUndisclosed),
     resumeCuration: meta.resumeCuration || 'not_needed',
+    archived: Boolean(meta.archived),
+    archivedAt: meta.archivedAt || null,
     visaStatus: meta.visaStatus || null,
     timezoneShift: meta.timezoneShift || null,
     noticePeriod: meta.noticePeriod || null,
@@ -81,6 +85,8 @@ const mapToDb = (app, userId) => ({
   salary_max: Number(app.salaryMax) || 0,
   salary_undisclosed: Boolean(app.salaryUndisclosed),
   resume_curation: app.resumeCuration || 'not_needed',
+  archived: Boolean(app.archived),
+  archived_at: app.archivedAt || null,
   currency: app.currency || 'INR',
   applied_date: app.appliedDate || (app.plannedApplyDate || new Date().toISOString().split('T')[0]),
   job_url: app.jobUrl || '',
@@ -97,6 +103,8 @@ const mapToDb = (app, userId) => ({
     salaryStocks: app.salaryStocks,
     salaryUndisclosed: app.salaryUndisclosed,
     resumeCuration: app.resumeCuration,
+    archived: app.archived,
+    archivedAt: app.archivedAt,
     visaStatus: app.visaStatus,
     timezoneShift: app.timezoneShift,
     noticePeriod: app.noticePeriod,
@@ -129,6 +137,8 @@ const mapFromDb = (item) => {
     salaryMax: Number(item.salary_max) || 0,
     salaryUndisclosed: Boolean(item.salary_undisclosed ?? meta.salaryUndisclosed),
     resumeCuration: item.resume_curation || meta.resumeCuration || 'not_needed',
+    archived: Boolean(item.archived ?? meta.archived),
+    archivedAt: item.archived_at || meta.archivedAt || null,
     currency: item.currency || meta.currency || 'INR',
     salaryPeriod: item.salary_period || meta.salaryPeriod || (isIntern ? 'monthly' : 'yearly'),
     hoursPerWeek: Number(item.hours_per_week || meta.hoursPerWeek) || 40,
@@ -163,12 +173,18 @@ const getUserStorageKey = (u) => (u && u.id ? `careertrack_apps_${u.id}` : 'care
 
 export default function App() {
   // User Auth State
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => getActiveUser());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
 
-  // Load Applications from LocalStorage or Initial Mock Data based on active user
+  // Load Applications from LocalStorage based on active user or guest
   const [applications, setApplications] = useState(() => {
     try {
+      const active = getActiveUser();
+      const userKey = getUserStorageKey(active);
+      const saved = localStorage.getItem(userKey);
+      if (saved) return JSON.parse(saved);
+
       const savedGuest = localStorage.getItem('careertrack_apps_guest') || localStorage.getItem(LOCAL_STORAGE_KEY);
       return savedGuest ? JSON.parse(savedGuest) : INITIAL_APPLICATIONS;
     } catch (e) {
@@ -201,77 +217,81 @@ export default function App() {
   const [editingApp, setEditingApp] = useState(null);
   const [initialStageForModal, setInitialStageForModal] = useState('applied');
   const [toast, setToast] = useState(null);
-  const [confirmState, setConfirmState] = useState({ isOpen: false, type: '', id: null });
+  const [confirmState, setConfirmState] = useState({ isOpen: false, type: '', id: null, title: '', message: '' });
 
   const showToast = (message, type = 'success') => {
     setToast({ message, type });
   };
 
-  // Sync Auth State with Supabase
+  // Sync Auth State with authService & Supabase
   useEffect(() => {
-    if (!supabase) return;
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    const unsubscribe = onAuthStateChange((currentUser) => {
+      setUser(currentUser);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    if (supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user && !getActiveUser()) {
+          const userObj = {
+            id: session.user.id,
+            email: session.user.email,
+            name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
+            avatar: session.user.user_metadata?.avatar_url,
+            authProvider: 'email',
+            isCloud: true
+          };
+          setUser(userObj);
+        }
+      });
+    }
 
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
-  // When user signs in or changes, switch to their personal isolated vault
+  // When user signs in, changes, or signs out, switch to their personal isolated vault
   useEffect(() => {
-    if (!user) return;
-
     let isMounted = true;
     const userKey = getUserStorageKey(user);
 
-    const loadUserData = async () => {
-      // 1. Load local personal user vault if available
+    const syncUserVault = async () => {
+      // 1. Load user's local personal vault
       try {
         const localUserData = localStorage.getItem(userKey);
         if (localUserData && isMounted) {
           setApplications(JSON.parse(localUserData));
+        } else if (!user && isMounted) {
+          const guestSaved = localStorage.getItem('careertrack_apps_guest') || localStorage.getItem(LOCAL_STORAGE_KEY);
+          setApplications(guestSaved ? JSON.parse(guestSaved) : INITIAL_APPLICATIONS);
+        } else if (user && isMounted) {
+          // If brand new user with no saved data, initialize personal starting vault
+          setApplications(INITIAL_APPLICATIONS);
+          localStorage.setItem(userKey, JSON.stringify(INITIAL_APPLICATIONS));
         }
       } catch (e) {
-        console.error('Failed to load local user cache:', e);
+        console.error('Failed to load user cache:', e);
       }
 
-      if (!supabase) return;
+      // 2. Fetch latest records from Supabase cloud database if configured
+      if (user && supabase) {
+        try {
+          const { data, error } = await supabase
+            .from('applications')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('applied_date', { ascending: false });
 
-      // 2. Fetch latest user records from Supabase cloud database
-      try {
-        const { data, error } = await supabase
-          .from('applications')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('applied_date', { ascending: false });
-
-        if (error) throw error;
-        if (data && data.length > 0 && isMounted) {
-          const loaded = data.map(mapFromDb);
-          setApplications(loaded);
-          localStorage.setItem(userKey, JSON.stringify(loaded));
-        } else if (isMounted) {
-          const localSaved = localStorage.getItem(userKey) || localStorage.getItem(LOCAL_STORAGE_KEY);
-          const initialLocal = localSaved ? JSON.parse(localSaved) : INITIAL_APPLICATIONS;
-          if (initialLocal.length > 0) {
-            const rowsToInsert = initialLocal.map(a => mapToDb(a, user.id));
-            await supabase.from('applications').upsert(rowsToInsert);
-            setApplications(initialLocal);
-            localStorage.setItem(userKey, JSON.stringify(initialLocal));
-            showToast('Personal cloud vault initialized for your account!');
+          if (!error && data && data.length > 0 && isMounted) {
+            const loaded = data.map(mapFromDb);
+            setApplications(loaded);
+            localStorage.setItem(userKey, JSON.stringify(loaded));
           }
+        } catch (err) {
+          console.warn('Supabase fetch error:', err);
         }
-      } catch (err) {
-        console.error('Failed to fetch from Supabase:', err);
       }
     };
 
-    loadUserData();
+    syncUserVault();
 
     return () => {
       isMounted = false;
@@ -296,18 +316,27 @@ export default function App() {
     localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
-  // Filter applications by search query
+  // Active vs Archived separation (Soft-delete ensures data is NEVER permanently lost)
+  const activeApplications = useMemo(() => {
+    return applications.filter(a => !a.archived);
+  }, [applications]);
+
+  const archivedApplications = useMemo(() => {
+    return applications.filter(a => Boolean(a.archived));
+  }, [applications]);
+
+  // Filter applications by search query on ACTIVE items
   const filteredApplications = useMemo(() => {
-    if (!searchQuery.trim()) return applications;
+    if (!searchQuery.trim()) return activeApplications;
     const q = searchQuery.toLowerCase();
-    return applications.filter(app => 
+    return activeApplications.filter(app => 
       app.company.toLowerCase().includes(q) ||
       app.title.toLowerCase().includes(q) ||
       (app.location && app.location.toLowerCase().includes(q)) ||
       (app.notes && app.notes.toLowerCase().includes(q)) ||
       (app.tags && app.tags.some(t => t.toLowerCase().includes(q)))
     );
-  }, [applications, searchQuery]);
+  }, [activeApplications, searchQuery]);
 
   // CRUD Actions
   const handleSaveApplication = async (appData) => {
@@ -328,7 +357,6 @@ export default function App() {
         if (error) throw error;
       } catch (err) {
         console.error('Supabase save error:', err);
-        showToast('Saved locally, but cloud sync failed.', 'error');
       }
     }
   };
@@ -368,23 +396,25 @@ export default function App() {
     }
   };
 
+  // Soft-delete: Move to Archive so data is NEVER permanently deleted
   const handleDeleteApplication = (id) => {
+    const target = applications.find(a => a.id === id);
     setConfirmState({
       isOpen: true,
-      type: 'delete_one',
+      type: 'archive_one',
       id,
-      title: 'Delete Application?',
-      message: 'Are you sure you want to remove this job application? This action cannot be undone.'
+      title: 'Move to Archive?',
+      message: `Are you sure you want to archive "${target?.company || 'this application'}"? It will be safely kept in your Archive section and can be restored back to your active board at any time.`
     });
   };
 
   const handleBulkDelete = (ids) => {
     setConfirmState({
       isOpen: true,
-      type: 'delete_bulk',
+      type: 'archive_bulk',
       id: ids,
-      title: `Delete ${ids.length} Applications?`,
-      message: 'Are you sure you want to delete all selected job applications?'
+      title: `Archive ${ids.length} Applications?`,
+      message: `Are you sure you want to move ${ids.length} applications to your Archive? They will be safely stored and can be restored anytime.`
     });
   };
 
@@ -401,25 +431,88 @@ export default function App() {
     }
   };
 
-  const confirmAction = async () => {
-    if (confirmState.type === 'delete_one') {
-      setApplications(prev => prev.filter(a => a.id !== confirmState.id));
-      showToast('Application deleted.', 'info');
-      if (user && supabase) {
-        await supabase.from('applications').delete().eq('id', confirmState.id);
+  // Restore archived application back to board
+  const handleRestoreApplication = async (id) => {
+    let restoredApp = null;
+    setApplications(prev => {
+      const updated = prev.map(a => {
+        if (a.id === id) {
+          restoredApp = { ...a, archived: false, archivedAt: null };
+          return restoredApp;
+        }
+        return a;
+      });
+      return updated;
+    });
+    showToast('Application restored back to board!');
+
+    if (user && supabase && restoredApp) {
+      try {
+        await supabase.from('applications').upsert(mapToDb(restoredApp, user.id));
+      } catch (err) {
+        console.warn('Supabase restore sync error:', err);
       }
-    } else if (confirmState.type === 'delete_bulk') {
-      setApplications(prev => prev.filter(a => !confirmState.id.includes(a.id)));
-      showToast(`${confirmState.id.length} applications deleted.`, 'info');
+    }
+  };
+
+  // Restore all archived applications
+  const handleRestoreAllArchived = async () => {
+    setApplications(prev => prev.map(a => a.archived ? { ...a, archived: false, archivedAt: null } : a));
+    showToast('All archived applications restored back to active board!');
+
+    if (user && supabase) {
+      try {
+        const rows = applications.filter(a => a.archived).map(a => mapToDb({ ...a, archived: false, archivedAt: null }, user.id));
+        if (rows.length > 0) {
+          await supabase.from('applications').upsert(rows);
+        }
+      } catch (err) {
+        console.warn('Supabase restore all sync error:', err);
+      }
+    }
+  };
+
+  const confirmAction = async () => {
+    const now = new Date().toISOString();
+
+    if (confirmState.type === 'archive_one' || confirmState.type === 'delete_one') {
+      let targetArchived = null;
+      setApplications(prev => prev.map(a => {
+        if (a.id === confirmState.id) {
+          targetArchived = { ...a, archived: true, archivedAt: now };
+          return targetArchived;
+        }
+        return a;
+      }));
+      showToast('Application moved to Archive.');
+
+      if (user && supabase && targetArchived) {
+        try {
+          await supabase.from('applications').upsert(mapToDb(targetArchived, user.id));
+        } catch (err) {
+          console.warn('Supabase archive sync error:', err);
+        }
+      }
+    } else if (confirmState.type === 'archive_bulk' || confirmState.type === 'delete_bulk') {
+      const ids = Array.isArray(confirmState.id) ? confirmState.id : [confirmState.id];
+      setApplications(prev => prev.map(a => ids.includes(a.id) ? { ...a, archived: true, archivedAt: now } : a));
+      showToast(`${ids.length} applications moved to Archive.`);
+
       if (user && supabase) {
-        await supabase.from('applications').delete().in('id', confirmState.id);
+        try {
+          const rows = applications.filter(a => ids.includes(a.id)).map(a => mapToDb({ ...a, archived: true, archivedAt: now }, user.id));
+          await supabase.from('applications').upsert(rows);
+        } catch (err) {
+          console.warn('Supabase bulk archive sync error:', err);
+        }
       }
     } else if (confirmState.type === 'reset') {
       setApplications(INITIAL_APPLICATIONS);
+      localStorage.removeItem(getUserStorageKey(user));
       localStorage.removeItem(LOCAL_STORAGE_KEY);
       showToast('Reset sample data to initial state.', 'info');
     }
-    setConfirmState({ isOpen: false, type: '', id: null });
+    setConfirmState({ isOpen: false, type: '', id: null, title: '', message: '' });
   };
 
   const handleResetData = () => {
@@ -432,13 +525,7 @@ export default function App() {
   };
 
   const handleSignOut = async () => {
-    if (supabase) {
-      try {
-        await supabase.auth.signOut();
-      } catch (err) {
-        console.error('Sign out error:', err);
-      }
-    }
+    await signOutUser();
     setUser(null);
     try {
       const guestSaved = localStorage.getItem('careertrack_apps_guest');
@@ -447,22 +534,6 @@ export default function App() {
       setApplications(INITIAL_APPLICATIONS);
     }
     showToast('Signed out. Switched to guest workspace.');
-  };
-
-  const handleSyncAllToCloud = async () => {
-    if (!user || !supabase) {
-      showToast('Please sign in to a personal vault first.', 'error');
-      return;
-    }
-    try {
-      const rows = applications.map(a => mapToDb(a, user.id));
-      const { error } = await supabase.from('applications').upsert(rows);
-      if (error) throw error;
-      showToast(`Successfully synchronized ${rows.length} applications to your cloud database!`);
-    } catch (err) {
-      console.error('Cloud sync error:', err);
-      showToast(`Cloud sync error: ${err.message || 'Please check database connection in Settings'}`, 'error');
-    }
   };
 
   // Export Data to JSON
@@ -566,25 +637,26 @@ export default function App() {
         onExportData={handleExportData}
         onImportData={handleImportData}
         onResetData={handleResetData}
-        totalApps={applications.length}
+        totalApps={activeApplications.length}
         user={user}
-        isConfigured={isSupabaseConfigured()}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onSignOut={handleSignOut}
+        archivedCount={archivedApplications.length}
+        onOpenArchiveModal={() => setIsArchiveModalOpen(true)}
         displayCurrency={displayCurrency}
         setDisplayCurrency={setDisplayCurrency}
       />
 
       {/* Main KPI Stats Bar */}
       <StatsOverview
-        applications={applications}
+        applications={activeApplications}
         displayCurrency={displayCurrency}
         onToggleCurrency={setDisplayCurrency}
       />
 
       {/* Smart Alert & Warning Indication for Applications Pending to Apply */}
       <PendingAlertBanner
-        applications={applications}
+        applications={activeApplications}
         onSelectApp={handleOpenEditModal}
         onUpdateStatus={handleUpdateStatus}
       />
@@ -616,14 +688,14 @@ export default function App() {
 
         {activeView === 'analytics' && (
           <AnalyticsView
-            applications={applications}
+            applications={activeApplications}
             displayCurrency={displayCurrency}
           />
         )}
 
         {activeView === 'calendar' && (
           <CalendarView
-            applications={applications}
+            applications={activeApplications}
             onSelectApp={handleOpenEditModal}
             onToggleInterviewComplete={handleToggleInterviewComplete}
             onAddInterview={handleAddInterview}
@@ -632,7 +704,7 @@ export default function App() {
 
         {activeView === 'comparer' && (
           <OfferComparer
-            applications={applications}
+            applications={activeApplications}
             displayCurrency={displayCurrency}
           />
         )}
@@ -654,7 +726,17 @@ export default function App() {
         />
       )}
 
-      {/* Supabase Authentication Modal */}
+      {/* Archived Applications Modal (Soft-deleted job applications) */}
+      <ArchivedModal
+        isOpen={isArchiveModalOpen}
+        onClose={() => setIsArchiveModalOpen(false)}
+        archivedApps={archivedApplications}
+        onRestore={handleRestoreApplication}
+        onRestoreAll={handleRestoreAllArchived}
+        displayCurrency={displayCurrency}
+      />
+
+      {/* Clean Consumer Authentication Modal */}
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
@@ -665,8 +747,7 @@ export default function App() {
         showToast={showToast}
         user={user}
         onSignOut={handleSignOut}
-        onSyncToCloud={handleSyncAllToCloud}
-        applicationsCount={applications.length}
+        applicationsCount={activeApplications.length}
       />
 
       {/* Confirmation Modal */}
@@ -675,7 +756,7 @@ export default function App() {
         title={confirmState.title}
         message={confirmState.message}
         onConfirm={confirmAction}
-        onCancel={() => setConfirmState({ isOpen: false, type: '', id: null })}
+        onCancel={() => setConfirmState({ isOpen: false, type: '', id: null, title: '', message: '' })}
       />
 
       {/* Toast Feedback */}
