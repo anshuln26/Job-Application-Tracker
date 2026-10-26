@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertCircle, LogIn } from 'lucide-react';
+import { AlertCircle, LogIn, Sparkles } from 'lucide-react';
 import Navbar from './components/Navbar';
 import StatsOverview from './components/StatsOverview';
 import KanbanBoard from './components/KanbanBoard';
@@ -210,18 +210,12 @@ export default function App() {
     try {
       const active = getActiveUser();
       if (!active || active.isGuest) {
-        return INITIAL_APPLICATIONS;
+        const guestSaved = localStorage.getItem('careertrack_apps_guest_temp');
+        return guestSaved ? JSON.parse(guestSaved) : [];
       }
       const userKey = getUserStorageKey(active);
       const saved = localStorage.getItem(userKey);
       if (saved) return JSON.parse(saved);
-
-      // Only default to initial applications if this is Anshul's main email
-      if (active.email?.toLowerCase().trim() === 'anshulnimore.26@gmail.com') {
-        const legacy = localStorage.getItem('careertrack_apps_v1') || localStorage.getItem('careertrack_apps_guest');
-        if (legacy) return JSON.parse(legacy);
-        return INITIAL_APPLICATIONS;
-      }
       return [];
     } catch (e) {
       console.error('Failed to parse saved applications:', e);
@@ -289,7 +283,7 @@ export default function App() {
         } else if (event === 'SIGNED_OUT') {
           setActiveUserSession(null);
           setUser(GUEST_USER);
-          setApplications(INITIAL_APPLICATIONS);
+          setApplications([]);
           setIsAuthModalOpen(true);
         }
       });
@@ -329,14 +323,15 @@ export default function App() {
     await signOutUser();
     setActiveUserSession(null);
     setUser(GUEST_USER);
-    setApplications(INITIAL_APPLICATIONS);
+    setApplications([]);
     setIsAuthModalOpen(true);
     showToast('Signed out successfully.', 'info');
   };
 
   const handleContinueAsGuest = () => {
     setUser(GUEST_USER);
-    setApplications(INITIAL_APPLICATIONS);
+    const guestSaved = localStorage.getItem('careertrack_apps_guest_temp');
+    setApplications(guestSaved ? JSON.parse(guestSaved) : []);
     setIsAuthModalOpen(false);
     showToast('Browsing as Guest. Changes will NOT be saved to the cloud.', 'warning');
   };
@@ -938,6 +933,26 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {applications.length === 0 && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setApplications(INITIAL_APPLICATIONS);
+                  showToast('Loaded sample demo jobs into guest view.', 'info');
+                }}
+                style={{
+                  fontSize: '0.825rem',
+                  fontWeight: 600,
+                  padding: '8px 14px',
+                  gap: '6px'
+                }}
+                title="Load sample demo jobs to preview how the board and analytics work"
+              >
+                <Sparkles size={14} />
+                Load Sample Demo Data
+              </button>
+            )}
             <button
               className="btn btn-primary"
               onClick={() => setIsAuthModalOpen(true)}
