@@ -15,7 +15,7 @@ import Footer from './components/Footer';
 import PendingAlertBanner from './components/PendingAlertBanner';
 import { INITIAL_APPLICATIONS } from './data/mockData';
 import { supabase } from './lib/supabaseClient';
-import { getActiveUser, signOutUser, onAuthStateChange } from './lib/authService';
+import { getActiveUser, setActiveUserSession, signOutUser, onAuthStateChange } from './lib/authService';
 
 const LOCAL_STORAGE_KEY = 'careertrack_apps_v1';
 const THEME_KEY = 'careertrack_theme_v1';
