@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Navbar from './components/Navbar';
 import StatsOverview from './components/StatsOverview';
 import KanbanBoard from './components/KanbanBoard';
@@ -72,55 +72,62 @@ const parseNotesWithMeta = (notesText) => {
 };
 
 // Helpers to map between DB snake_case and UI camelCase
-const mapToDb = (app, userId) => ({
-  id: app.id,
-  user_id: userId,
-  company: app.company,
-  title: app.title,
-  location: app.location || '',
-  work_type: app.workType || 'Remote',
-  status: app.status,
-  priority: app.priority || 'medium',
-  salary_min: Number(app.salaryMin) || 0,
-  salary_max: Number(app.salaryMax) || 0,
-  salary_undisclosed: Boolean(app.salaryUndisclosed),
-  resume_curation: app.resumeCuration || 'not_needed',
-  archived: Boolean(app.archived),
-  archived_at: app.archivedAt || null,
-  currency: app.currency || 'INR',
-  applied_date: app.appliedDate || (app.plannedApplyDate || new Date().toISOString().split('T')[0]),
-  job_url: app.jobUrl || '',
-  contact_name: app.contactName || '',
-  contact_email: app.contactEmail || '',
-  resume_version: app.resumeVersion || '',
-  tags: app.tags || [],
-  notes: serializeNotesWithMeta(app.notes, {
-    currency: app.currency,
-    salaryPeriod: app.salaryPeriod,
-    hoursPerWeek: app.hoursPerWeek,
-    salaryBase: app.salaryBase,
-    salaryBonus: app.salaryBonus,
-    salaryStocks: app.salaryStocks,
-    salaryUndisclosed: app.salaryUndisclosed,
-    resumeCuration: app.resumeCuration,
-    archived: app.archived,
-    archivedAt: app.archivedAt,
-    visaStatus: app.visaStatus,
-    timezoneShift: app.timezoneShift,
-    noticePeriod: app.noticePeriod,
-    noticeEndDate: app.noticeEndDate,
-    deadline: app.deadline,
-    plannedApplyDate: app.plannedApplyDate,
-    referralStatus: app.referralStatus,
-    referralContact: app.referralContact,
-    referralRole: app.referralRole,
-    referralLinkedin: app.referralLinkedin,
-    referralDate: app.referralDate,
-    referralNotes: app.referralNotes
-  }),
-  timeline: app.timeline || [],
-  interviews: app.interviews || []
-});
+const mapToDb = (app, userOrId, fallbackEmail = null) => {
+  const userId = typeof userOrId === 'object' ? userOrId?.id : userOrId;
+  const userEmail = typeof userOrId === 'object' ? userOrId?.email : fallbackEmail;
+  const cleanEmail = userEmail ? userEmail.toLowerCase().trim() : null;
+
+  return {
+    id: app.id,
+    user_id: userId || null,
+    user_email: cleanEmail,
+    company: app.company,
+    title: app.title,
+    location: app.location || '',
+    work_type: app.workType || 'Remote',
+    status: app.status,
+    priority: app.priority || 'medium',
+    salary_min: Number(app.salaryMin) || 0,
+    salary_max: Number(app.salaryMax) || 0,
+    salary_undisclosed: Boolean(app.salaryUndisclosed),
+    resume_curation: app.resumeCuration || 'not_needed',
+    archived: Boolean(app.archived),
+    archived_at: app.archivedAt || null,
+    currency: app.currency || 'INR',
+    applied_date: app.appliedDate || (app.plannedApplyDate || new Date().toISOString().split('T')[0]),
+    job_url: app.jobUrl || '',
+    contact_name: app.contactName || '',
+    contact_email: app.contactEmail || '',
+    resume_version: app.resumeVersion || '',
+    tags: app.tags || [],
+    notes: serializeNotesWithMeta(app.notes, {
+      currency: app.currency,
+      salaryPeriod: app.salaryPeriod,
+      hoursPerWeek: app.hoursPerWeek,
+      salaryBase: app.salaryBase,
+      salaryBonus: app.salaryBonus,
+      salaryStocks: app.salaryStocks,
+      salaryUndisclosed: app.salaryUndisclosed,
+      resumeCuration: app.resumeCuration,
+      archived: app.archived,
+      archivedAt: app.archivedAt,
+      visaStatus: app.visaStatus,
+      timezoneShift: app.timezoneShift,
+      noticePeriod: app.noticePeriod,
+      noticeEndDate: app.noticeEndDate,
+      deadline: app.deadline,
+      plannedApplyDate: app.plannedApplyDate,
+      referralStatus: app.referralStatus,
+      referralContact: app.referralContact,
+      referralRole: app.referralRole,
+      referralLinkedin: app.referralLinkedin,
+      referralDate: app.referralDate,
+      referralNotes: app.referralNotes
+    }),
+    timeline: app.timeline || [],
+    interviews: app.interviews || []
+  };
+};
 
 const mapFromDb = (item) => {
   const { cleanNotes, meta } = parseNotesWithMeta(item.notes);
@@ -169,11 +176,16 @@ const mapFromDb = (item) => {
   };
 };
 
-const getUserStorageKey = (u) => (u && u.id ? `careertrack_apps_${u.id}` : 'careertrack_apps_guest');
+const getUserStorageKey = (u) => {
+  if (u?.email) return `careertrack_apps_${u.email.toLowerCase().trim()}`;
+  if (u?.id) return `careertrack_apps_${u.id}`;
+  return 'careertrack_apps_guest';
+};
 
 export default function App() {
   // User Auth State
   const [user, setUser] = useState(() => getActiveUser());
+  const prevUserRef = useRef(user);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState(() => {
@@ -185,19 +197,25 @@ export default function App() {
     return false;
   });
 
-  // Load Applications from LocalStorage based on active user or guest
+  // Load Applications from LocalStorage based on active user
   const [applications, setApplications] = useState(() => {
     try {
       const active = getActiveUser();
+      if (!active) return [];
       const userKey = getUserStorageKey(active);
       const saved = localStorage.getItem(userKey);
       if (saved) return JSON.parse(saved);
 
-      const savedGuest = localStorage.getItem('careertrack_apps_guest') || localStorage.getItem(LOCAL_STORAGE_KEY);
-      return savedGuest ? JSON.parse(savedGuest) : INITIAL_APPLICATIONS;
+      // Only default to initial applications if this is Anshul's main email
+      if (active.email?.toLowerCase().trim() === 'anshulnimore.26@gmail.com') {
+        const legacy = localStorage.getItem('careertrack_apps_v1') || localStorage.getItem('careertrack_apps_guest');
+        if (legacy) return JSON.parse(legacy);
+        return INITIAL_APPLICATIONS;
+      }
+      return [];
     } catch (e) {
       console.error('Failed to parse saved applications:', e);
-      return INITIAL_APPLICATIONS;
+      return [];
     }
   });
 
@@ -231,7 +249,7 @@ export default function App() {
     setToast({ message, type });
   };
 
-  // Sync Auth State with authService & Supabase
+  // Sync Auth State with authService & Supabase (Ensures persistence on Chrome restart)
   useEffect(() => {
     const unsubscribe = onAuthStateChange((currentUser) => {
       if (!isRecoveryMode) {
@@ -240,44 +258,48 @@ export default function App() {
     });
 
     if (supabase) {
-      // 1. Listen for Supabase auth events (specifically PASSWORD_RECOVERY)
+      // 1. Listen for Supabase auth events
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY') {
           setIsRecoveryMode(true);
           setIsAuthModalOpen(true);
-        } else if (event === 'SIGNED_IN' && !isRecoveryMode) {
+        } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && !isRecoveryMode) {
           if (session?.user) {
             const userObj = {
               id: session.user.id,
-              email: session.user.email,
-              name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
-              avatar: session.user.user_metadata?.avatar_url,
-              authProvider: 'email',
+              email: session.user.email?.toLowerCase().trim(),
+              name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+              avatar: session.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session.user.email || 'user')}`,
+              authProvider: session.user.app_metadata?.provider || 'email',
               isCloud: true
             };
+            setActiveUserSession(userObj);
             setUser(userObj);
           }
         } else if (event === 'SIGNED_OUT') {
+          setActiveUserSession(null);
           setUser(null);
+          setApplications([]);
         }
       });
 
-      // 2. Initial session check on load
+      // 2. Initial session check on load / restart
       supabase.auth.getSession().then(({ data: { session } }) => {
         const hash = typeof window !== 'undefined' ? window.location.hash : '';
         const search = typeof window !== 'undefined' ? window.location.search : '';
         const isRec = hash.includes('type=recovery') || search.includes('type=recovery');
         if (isRec) {
           setIsRecoveryMode(true);
-        } else if (session?.user && !getActiveUser()) {
+        } else if (session?.user) {
           const userObj = {
             id: session.user.id,
-            email: session.user.email,
-            name: session.user.user_metadata?.full_name || session.user.email.split('@')[0],
-            avatar: session.user.user_metadata?.avatar_url,
-            authProvider: 'email',
+            email: session.user.email?.toLowerCase().trim(),
+            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+            avatar: session.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(session.user.email || 'user')}`,
+            authProvider: session.user.app_metadata?.provider || 'email',
             isCloud: true
           };
+          setActiveUserSession(userObj);
           setUser(userObj);
         }
       });
@@ -294,6 +316,7 @@ export default function App() {
   // Handle Sign Out cleanly
   const handleSignOut = async () => {
     await signOutUser();
+    setActiveUserSession(null);
     setUser(null);
     setApplications([]);
     setIsAuthModalOpen(false);
@@ -305,6 +328,7 @@ export default function App() {
     let isMounted = true;
     if (!user) return;
 
+    const userEmail = (user.email || '').toLowerCase().trim();
     const userKey = getUserStorageKey(user);
 
     const syncUserVault = async () => {
@@ -313,6 +337,9 @@ export default function App() {
         const localUserData = localStorage.getItem(userKey);
         if (localUserData && isMounted) {
           setApplications(JSON.parse(localUserData));
+        } else if (isMounted) {
+          // New user starts completely fresh with 0 applications
+          setApplications([]);
         }
       } catch (e) {
         console.error('Failed to load user cache:', e);
@@ -321,32 +348,62 @@ export default function App() {
       // 2. Fetch latest records from Supabase cloud database
       if (supabase) {
         try {
-          const { data, error } = await supabase
-            .from('applications')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('applied_date', { ascending: false });
-
-          if (!error && data && data.length > 0 && isMounted) {
-            const loaded = data.map(mapFromDb);
-            setApplications(loaded);
-            localStorage.setItem(userKey, JSON.stringify(loaded));
-          } else if (user.email === 'anshulnimore.26@gmail.com' && (!data || data.length === 0)) {
-            // Anshul's fixed cloud vault backup check
-            const { data: anshulData } = await supabase
+          let cloudApps = [];
+          if (userEmail) {
+            const { data, error } = await supabase
               .from('applications')
               .select('*')
-              .eq('user_id', '80b27bdc-dfb0-4b2f-8b22-b45613aea5ca')
+              .eq('user_email', userEmail)
               .order('applied_date', { ascending: false });
-            if (anshulData && anshulData.length > 0 && isMounted) {
-              const loaded = anshulData.map(mapFromDb);
-              setApplications(loaded);
-              localStorage.setItem(userKey, JSON.stringify(loaded));
+
+            if (!error && data && data.length > 0) {
+              cloudApps = data.map(mapFromDb);
             }
-          } else if (isMounted && !localStorage.getItem(userKey)) {
-            // New user starts with clean empty personal vault
-            setApplications([]);
-            localStorage.setItem(userKey, JSON.stringify([]));
+          }
+
+          // Fallback check by user_id if user_email query returned empty
+          if (cloudApps.length === 0 && user.id) {
+            const { data, error } = await supabase
+              .from('applications')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('applied_date', { ascending: false });
+
+            if (!error && data && data.length > 0) {
+              cloudApps = data.map(mapFromDb);
+              // Backfill user_email so future queries find them by email
+              if (userEmail) {
+                await supabase.from('applications').update({ user_email: userEmail }).eq('user_id', user.id);
+              }
+            }
+          }
+
+          // Legacy data auto-migration for Anshul (HPE intern, Stripe SDE intern, etc. from pre-auth local storage)
+          if (userEmail === 'anshulnimore.26@gmail.com') {
+            try {
+              const legacyRaw = localStorage.getItem('careertrack_apps_v1') || localStorage.getItem('careertrack_apps_guest');
+              if (legacyRaw) {
+                const legacyApps = JSON.parse(legacyRaw);
+                if (Array.isArray(legacyApps) && legacyApps.length > 0) {
+                  const existingKeys = new Set(cloudApps.map(a => `${(a.company || '').toLowerCase()}-${(a.title || '').toLowerCase()}`));
+                  const toMigrate = legacyApps.filter(a => a && a.company && !existingKeys.has(`${(a.company || '').toLowerCase()}-${(a.title || '').toLowerCase()}`));
+                  if (toMigrate.length > 0) {
+                    for (const app of toMigrate) {
+                      const dbPayload = mapToDb(app, user);
+                      await supabase.from('applications').upsert(dbPayload);
+                    }
+                    cloudApps = [...toMigrate, ...cloudApps];
+                  }
+                }
+              }
+            } catch (migErr) {
+              console.warn('Legacy migration check notice:', migErr);
+            }
+          }
+
+          if (isMounted) {
+            setApplications(cloudApps);
+            localStorage.setItem(userKey, JSON.stringify(cloudApps));
           }
         } catch (err) {
           console.warn('Supabase fetch error:', err);
@@ -361,14 +418,16 @@ export default function App() {
     };
   }, [user]);
 
-  // Sync LocalStorage whenever applications or active user changes
+  // Sync LocalStorage whenever applications change for active user
   useEffect(() => {
+    if (!user) return;
+    if (prevUserRef.current?.email !== user.email) {
+      prevUserRef.current = user;
+      return;
+    }
     try {
       const key = getUserStorageKey(user);
       localStorage.setItem(key, JSON.stringify(applications));
-      if (!user) {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(applications));
-      }
     } catch (e) {
       console.error('Failed to save applications:', e);
     }
@@ -416,7 +475,7 @@ export default function App() {
 
     if (user && supabase) {
       try {
-        const { error } = await supabase.from('applications').upsert(mapToDb(appData, user.id));
+        const { error } = await supabase.from('applications').upsert(mapToDb(appData, user));
         if (error) throw error;
       } catch (err) {
         console.error('Supabase save error:', err);
@@ -511,7 +570,7 @@ export default function App() {
 
     if (user && supabase && restoredApp) {
       try {
-        await supabase.from('applications').upsert(mapToDb(restoredApp, user.id));
+        await supabase.from('applications').upsert(mapToDb(restoredApp, user));
       } catch (err) {
         console.warn('Supabase restore sync error:', err);
       }
@@ -525,7 +584,7 @@ export default function App() {
 
     if (user && supabase) {
       try {
-        const rows = applications.filter(a => a.archived).map(a => mapToDb({ ...a, archived: false, archivedAt: null }, user.id));
+        const rows = applications.filter(a => a.archived).map(a => mapToDb({ ...a, archived: false, archivedAt: null }, user));
         if (rows.length > 0) {
           await supabase.from('applications').upsert(rows);
         }
@@ -551,7 +610,7 @@ export default function App() {
 
       if (user && supabase && targetArchived) {
         try {
-          await supabase.from('applications').upsert(mapToDb(targetArchived, user.id));
+          await supabase.from('applications').upsert(mapToDb(targetArchived, user));
         } catch (err) {
           console.warn('Supabase archive sync error:', err);
         }
@@ -563,7 +622,7 @@ export default function App() {
 
       if (user && supabase) {
         try {
-          const rows = applications.filter(a => ids.includes(a.id)).map(a => mapToDb({ ...a, archived: true, archivedAt: now }, user.id));
+          const rows = applications.filter(a => ids.includes(a.id)).map(a => mapToDb({ ...a, archived: true, archivedAt: now }, user));
           await supabase.from('applications').upsert(rows);
         } catch (err) {
           console.warn('Supabase bulk archive sync error:', err);

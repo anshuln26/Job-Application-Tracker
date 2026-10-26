@@ -124,7 +124,7 @@ export const signInWithEmail = async (email, password) => {
       if (data?.user) {
         const userObj = {
           id: data.user.id,
-          email: data.user.email,
+          email: data.user.email?.toLowerCase().trim(),
           name: data.user.user_metadata?.full_name || cleanEmail.split('@')[0],
           avatar: data.user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanEmail)}`,
           authProvider: 'email',
@@ -136,18 +136,26 @@ export const signInWithEmail = async (email, password) => {
     } catch (supabaseErr) {
       console.warn('Supabase sign-in error:', supabaseErr.message);
       
-      // If error is explicit bad credentials or unconfirmed, return directly
-      if (
-        supabaseErr.message?.toLowerCase().includes('invalid login credentials') ||
-        supabaseErr.message?.toLowerCase().includes('email not confirmed')
-      ) {
+      if (supabaseErr.message?.toLowerCase().includes('not confirmed')) {
         return {
           success: false,
-          unconfirmed: supabaseErr.message?.toLowerCase().includes('not confirmed'),
+          unconfirmed: true,
           email: cleanEmail,
-          error: supabaseErr.message
+          error: 'Your email address is not yet verified. Please enter the 6-digit verification code.'
         };
       }
+      if (supabaseErr.message?.toLowerCase().includes('invalid login credentials')) {
+        return {
+          success: false,
+          email: cleanEmail,
+          error: 'Invalid password or credentials. If you originally created this account with Google OAuth, please use "Continue with Google", or click "Forgot password?" to set a password.'
+        };
+      }
+      return {
+        success: false,
+        email: cleanEmail,
+        error: supabaseErr.message || 'Invalid email or password.'
+      };
     }
   }
 
