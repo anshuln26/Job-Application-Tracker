@@ -37,7 +37,6 @@ export default function Navbar({
   setTheme,
   onExportData,
   onImportData,
-  onResetData,
   user,
   onOpenAuthModal,
   onSignOut,
