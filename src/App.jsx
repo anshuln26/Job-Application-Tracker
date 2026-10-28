@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { AlertCircle, LogIn, Sparkles } from 'lucide-react';
+import { AlertCircle, LogIn } from 'lucide-react';
 import Navbar from './components/Navbar';
 import StatsOverview from './components/StatsOverview';
 import KanbanBoard from './components/KanbanBoard';
@@ -430,30 +430,6 @@ export default function App() {
               if (userEmail) {
                 await supabase.from('applications').update({ user_email: userEmail }).eq('user_id', user.id);
               }
-            }
-          }
-
-          // Legacy data auto-migration for Anshul (HPE intern, Stripe SDE intern, etc. from pre-auth local storage)
-          if (userEmail === 'anshulnimore.26@gmail.com') {
-            try {
-              const legacyRaw = localStorage.getItem('careertrack_apps_v1');
-              if (legacyRaw) {
-                const legacyApps = JSON.parse(legacyRaw);
-                if (Array.isArray(legacyApps) && legacyApps.length > 0) {
-                  const existingKeys = new Set(cloudApps.map(a => `${(a.company || '').toLowerCase()}-${(a.title || '').toLowerCase()}`));
-                  const toMigrate = legacyApps.filter(a => a && a.company && !existingKeys.has(`${(a.company || '').toLowerCase()}-${(a.title || '').toLowerCase()}`));
-                  if (toMigrate.length > 0) {
-                    for (const app of toMigrate) {
-                      const dbPayload = mapToDb(app, user);
-                      await supabase.from('applications').upsert(dbPayload);
-                    }
-                    cloudApps = [...toMigrate, ...cloudApps];
-                  }
-                }
-                localStorage.removeItem('careertrack_apps_v1');
-              }
-            } catch (migErr) {
-              console.warn('Legacy migration check notice:', migErr);
             }
           }
 
