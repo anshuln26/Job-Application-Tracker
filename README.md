@@ -1,256 +1,93 @@
-# 💼 CareerTrack Pro — Advanced Job Application Tracker
+# ApplyTrack — Job Application Tracker
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Vercel-success?style=for-the-badge&logo=vercel)](https://job-application-tracker-alpha-seven.vercel.app)
-[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
-[![WCAG](https://img.shields.io/badge/Accessibility-WCAG%20AA-blueviolet?style=for-the-badge)](https://www.w3.org/WAI/standards-guidelines/wcag/)
-[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+[![CI](https://github.com/anshuln26/Job-Application-Tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/anshuln26/Job-Application-Tracker/actions/workflows/ci.yml)
+[![Live demo](https://img.shields.io/badge/demo-live-4f46e5)](https://job-application-tracker-alpha-seven.vercel.app)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-A modern, cloud-synced career management platform designed for global software engineering job seekers and interns. Features a mandatory first-screen authentication gate, a 100% blank guest exploration mode, strict multi-user cloud vault isolation with Supabase PostgreSQL, dual-currency analytics (INR/USD), interview schedule tracking, LinkedIn referral monitoring, and offer comparison.
+Track every job application, interview, referral and offer in one fast, private workspace.
 
-🌐 **Live Application**: [https://job-application-tracker-alpha-seven.vercel.app](https://job-application-tracker-alpha-seven.vercel.app)
+**[Live app →](https://job-application-tracker-alpha-seven.vercel.app)** — click **Try the demo** to explore with sample data, no signup needed.
 
----
+![Dashboard](docs/screenshots/dashboard.png)
 
-## 🌟 Key Highlights & Features
+## Features
 
-### 🇮🇳 / 🌐 1. Dual & Multi-Currency Engine
-- **One-Click Currency Switcher**: Seamlessly toggle between **INR (₹)** and **USD ($)** anywhere in the application with instant re-calculations.
-- **Indian Financial Notation**: Automatic Lakhs & Crores formatting for Indian candidates (e.g., `₹12.0L - ₹18.5L`, `₹1.2Cr`).
-- **Native Multi-Currency Mode**: Track international compensation in original local currencies with real-time conversion rates across 10 global economies:
-  - 🇮🇳 **INR** (Indian Rupee)
-  - 🇺🇸 **USD** (US Dollar)
-  - 🇦🇪 **AED** (UAE Dirham)
-  - 🇬🇧 **GBP** (British Pound)
-  - 🇪🇺 **EUR** (Euro)
-  - 🇦🇺 **AUD** (Australian Dollar)
-  - 🇨🇦 **CAD** (Canadian Dollar)
-  - 🇯🇵 **JPY** (Japanese Yen)
-  - 🇰🇷 **KRW** (South Korean Won)
-  - 🇨🇳 **CNY** (Chinese Yuan)
-- **Live Conversion Preview**: Built-in interactive currency conversion calculator inside application cards and the job detail modal.
+- **Kanban pipeline:** drag applications between six stages (Wishlist → Networking → Applied → Interviewing → Offer / Rejected). Works with mouse, touch and keyboard, uses optimistic updates, and logs every move to the application's timeline.
+- **Dashboard:** active pipeline, weekly progress, response rate, the next 14 days of interviews and deadlines, and reminders for applications that need a follow-up or a tailored resume.
+- **Application detail page:** interviews (with done/undone), a timeline of updates, inline notes, referral and recruiter contact info, and compensation converted to your display currency.
+- **Searchable table:** full-text search, stage and work-type filters, sortable columns, bulk move / archive / delete, and filters saved in the URL.
+- **Calendar:** month view of interviews, deadlines and planned apply dates, plus **.ics export** to Google Calendar, Outlook or Apple Calendar.
+- **Analytics:** weekly applications, stage breakdown, conversion funnel, which sources lead to interviews, and an offer comparison across currencies.
+- **Pay in any format:** yearly CTC, monthly stipend or hourly rate in 11 currencies, with INR shown in lakh/crore (₹12.5L, ₹1.2Cr).
+- **Import / export:** CSV (spreadsheet-safe) and full JSON backups.
+- **Keyboard-first:** `⌘K` / `Ctrl+K` command palette, `N` to add an application.
+- **Accounts:** email + password with email confirmation, Google sign-in, password reset, and self-service account deletion.
+- **Demo mode:** a sandbox stored in the browser, so recruiters can try the app without creating an account.
+- **Responsive and themed:** mobile bottom navigation, light/dark/system theme, and accessible dialogs (focus trap, Escape to close, ARIA roles).
 
----
+| Board | Detail | Mobile |
+| --- | --- | --- |
+| ![Board](docs/screenshots/board.png) | ![Detail](docs/screenshots/detail.png) | ![Mobile](docs/screenshots/mobile.png) |
 
-### 🎓 / 💼 2. Intern Monthly Stipend & Hourly Wage Support
-- **Flexible Compensation Periods**:
-  - **Yearly**: Annual CTC for full-time software engineering roles.
-  - **Monthly**: Monthly stipend for internship opportunities.
-  - **Hourly**: Contract/hourly wage with customizable expected hours per week (defaults to 40 hrs/wk).
-- **Smart Dual-View KPI Card**:
-  - Automatically switches between **"💼 Avg Target Salary"** (annualized) and **"🎓 Avg Intern Stipend"** (monthly) based on your active pipeline.
-  - Interactive pill switcher to manually toggle between Annual and Intern stipend analytics.
+| Analytics | Dark mode |
+| --- | --- |
+| ![Analytics](docs/screenshots/analytics.png) | ![Dark mode](docs/screenshots/dark.png) |
 
----
+## Tech stack
 
-### 🌍 3. Global Applicant & Remote Relocation Suite
-- **Visa Sponsorship & Work Authorization Tracker**:
-  - Categorize roles by visa requirements: *US H-1B*, *F-1 OPT/STEM*, *UK Skilled Worker*, *EU Blue Card*, *UAE Golden/Green Visa*, *Need Sponsorship*, *Citizen / Permanent Resident*, or *No Sponsorship Available*.
-  - Visual color-coded authorization badges appear on Kanban cards and the table view.
-- **Timezone Overlap & Shift Warning**:
-  - Visual indicators calculating timezone difference relative to candidate's local time (IST, EST, PST, GMT, CET, JST/KST, AEST).
-  - Smart shift flags warn about high night-shift or offset requirements (e.g., `⚡ PST -12.5h · Significant Shift`, `✅ CET -4.5h · Good Overlap`).
-- **Notice Period & Availability Tracker**:
-  - Track current employment notice period (Immediate, 15 days, 30 days, 60 days, 90 days) with automated countdown to planned end date.
+| Layer | Choice |
+| --- | --- |
+| UI | React 19, TypeScript (strict), Tailwind CSS v4 |
+| Routing / data | React Router 7, TanStack Query 5 (caching, optimistic mutations) |
+| Drag & drop | dnd-kit |
+| Charts | Recharts |
+| Backend | Supabase: Postgres, Auth, Row Level Security |
+| Tooling | Vite 8, Vitest + Testing Library, oxlint, GitHub Actions CI |
+| Hosting | Vercel |
 
----
+## Architecture
 
-### 📄 4. Resume Curation & JD Alignment Tracker
-- **Targeted Resume Alignment**: In competitive markets, applicants tailor their resume for each Job Description and company.
-- **3 Curation States**:
-  - `✨ Tailored for this JD`: Resume customized with keywords and experience matching the specific posting.
-  - `⏳ Needs Tailoring (Reminder)`: Triggers automatic amber warning badges across the Kanban board, Table view, and Urgency Banner reminding you to tailor before submitting.
-  - `📄 Standard / Not Needed`: Standard generalized master resume.
-- **Specific Resume Version Tracking**: Record exact file version uploaded (e.g., `Fullstack_React_2026.pdf`, `DataEng_AWS.pdf`).
+```
+src/
+├── auth/AuthProvider.tsx      Session state, demo mode, picks the storage backend
+├── data/
+│   ├── repository.ts          Repository interface → Supabase or localStorage (demo)
+│   ├── mappers.ts             DB rows ⇄ domain objects, legacy data normalization
+│   └── demo.ts                Sample data with dates relative to today
+├── hooks/useApplications.ts   TanStack Query hooks with optimistic updates
+├── lib/                       Pure logic: stats, currency, CSV, dates (unit-tested)
+├── components/                UI primitives, app shell, command palette, forms
+└── pages/                     Route-level screens (lazy-loaded)
+```
 
----
+- **One interface, two backends.** Screens talk to a `Repository`. Signed-in users get the Supabase implementation, and demo users get a `localStorage` one, so the demo runs exactly the same code as the real app.
+- **Security is enforced in the database.** RLS policies (`auth.uid() = user_id`) mean even a modified client can't read or change anyone else's rows. Auth flows use Supabase's built-in email confirmation and recovery. No secrets live in the client.
+- **Code-splitting.** Each page is lazy-loaded, so the initial bundle is about 110 KB gzipped and the charts library loads only on the Analytics page.
 
-### 💰 5. Undisclosed & Optional Salary Mode
-- **Optional Compensation**: Putting stipend or annual income is strictly non-mandatory.
-- **"Salary Not Disclosed by Company" Toggle**: Instantly marks the position as undisclosed and displays elegant neutral badges across cards and tables.
-- **Clean Fallback**: Blank inputs default safely without skewing analytics or conversion calculations.
+## Run it locally
 
----
-
-### 📍 6. Intelligent Location Recommendations
-- **Auto-Learning Location Presets**: Adding custom locations (e.g., `South Korea`, `Tokyo, Japan`, `Berlin, Germany`, `Chennai, India`, `Dublin, Ireland`) automatically saves them to personal recommendations.
-- **Quick-Fill Pills**: One-click pills allow instant selection when adding subsequent applications.
-- **Recommendation Manager**: Add with 1-click or remove unused presets anytime.
-
----
-
-### 🚨 7. Smart Action Center & Urgent Attention Banner
-- **Approaching Deadlines**: Dynamic countdown alerts (`🚨 Deadline Today`, `⚠️ Deadline in 3 days`, `Expired`). Deadlines can also be left blank for rolling admissions.
-- **Pending Submissions**: Highlights jobs saved in *Wishlist* or *Waiting for Referral* to prevent missed application windows.
-- **Planned vs. Actual Dates**: Enforces planned apply date for wishlist/referral, and actual applied date for submitted positions.
-- **Resume Tailoring Alert**: Banner directly displays the count of applications waiting for resume customization.
-- **Quick Action Triggers**: Mark as applied directly from the urgency banner with one click.
-
----
-
-### 🤝 5. LinkedIn Referral & Networking Manager
-- **Employee Referral Tracking**: Record contact name, job title, and direct LinkedIn profile URL for company referrers.
-- **Outreach Timeline**: Track connection request dates, follow-up status, and custom referral notes before submitting formal applications.
-
----
-
-### 📋 6. Kanban Pipeline & Advanced Table View
-- **6 Pipeline Stages**: *Wishlist* ➔ *Waiting for Referral* ➔ *Applied* ➔ *Interviewing* ➔ *Offer Received* ➔ *Rejected*.
-- **Drag-and-Drop / Instant Transition**: Easily advance stages from Kanban cards or inline select dropdowns.
-- **Batch Operations**: Bulk selection, bulk status update, and bulk delete in Table view.
-- **Customizable Filtering**: Filter by keyword, location, work model (Remote, Hybrid, On-site), priority, visa status, or approaching deadlines.
-
----
-
-### 📊 7. Visual Analytics Dashboard
-- Interactive charts powered by **Recharts**:
-  - **Application Status Distribution**: Donut breakdown of current pipeline stages.
-  - **Conversion Funnel**: From application submission to interview and final offer.
-  - **Target Salary Spread**: Bar chart comparing compensation ranges across target companies.
-  - **Theme-Adaptive Tooltips**: Fully styled for high contrast in both light and dark themes.
-
----
-
-### 📅 8. Unified Interview Calendar & Schedule Tracker
-- Centralized agenda combining upcoming interview rounds and application deadlines.
-- Mark interview rounds (*HR Screen*, *Technical Phone Screen*, *System Design*, *Take-Home Assessment*, *Onsite / Behavioral*) as completed with interactive checkboxes.
-- Add new interview events directly to any application.
-
----
-
-### ⚖️ 9. Job Offer Evaluator & Comparison Matrix
-- Side-by-side compensation evaluation including base pay, annual bonus, and equity/stocks.
-- Interactive rating sliders for **Remote Flexibility**, **Culture & Team Alignment**, and **Career Growth**.
-- Automated 100-point composite scoring with celebratory confetti for the top-ranked offer.
-
----
-
-### ☀️ / 🌙 10. Dual-Theme Design System (WCAG AA/AAA Compliant)
-- **High-Contrast Slate Light Mode**: Custom-crafted light theme with Slate palette (`#0F172A`, `#475569`, `#64748B`) ensuring high readability, elevated card containers, and zero washed-out pastels.
-- **Sleek Glassmorphic Dark Mode**: Deep navy backdrops with luminous neon accents and subtle ambient glows.
-- **Persistent Theme Preference**: Synchronized with browser `localStorage`.
-
----
-
-### 🔐 11. Initial Authentication Gate & Multi-User Cloud Isolation
-- **First-Screen Authentication Gate (Zero Data Leaks)**:
-  - When opening CareerTrack Pro (in **Incognito**, a fresh browser, or after signing out), the application enforces an **Authentication Gate** upfront before exposing the dashboard.
-  - The dashboard is guarded until the visitor authenticates or deliberately chooses Guest Mode.
-- **Enter as Guest User (100% Blank Slate — No Mock Data)**:
-  - Prospective users can click **"Enter as Guest User (Try without an account) →"** to evaluate the complete platform instantly.
-  - Opens a **completely blank workspace (0 applications)** with zero sample or demo data clutter, ready for entering real job applications immediately.
-  - Displays a persistent in-session warning banner clarifying that changes are temporary to the active browser tab and will not be backed up to the cloud.
-- **Strict User Account & Cloud Vault Isolation**:
-  - Signing in via **Google OAuth** or **Email & Password** opens only the personal data associated with that specific account ID.
-  - Every account possesses a private PostgreSQL cloud vault protected by Supabase Row-Level Security (RLS) policies scoped strictly to `auth.uid() = user_id`.
-  - Switching between different user accounts seamlessly isolates their respective pipeline, interviews, offer comparisons, notes, and custom location presets.
-- **Clean Sign-Out Protection**:
-  - Clicking **Sign Out** immediately flushes in-memory tab state (`sessionStorage`), purges active session credentials, clears the application view to 0, and returns directly to the Authentication Gate.
-- **Zero Technical Friction**: Removed technical database settings and cloud configuration prompts from the end-user interface.
-
----
-
-### 📦 12. Soft-Delete Application Archiving (Zero Data Loss)
-- **Safe Archival System**: When deleting any job application, the data is **never permanently deleted**. It is safely moved to the **Archived Applications** vault.
-- **Quick-Access Archive Vault**: Navbar features a dynamic `Archive` button with a real-time badge count whenever archived records exist.
-- **Full History & Restoration**: Search and inspect archived applications, view archived timestamps, and restore any job (or all archived jobs) back to the active board with one click (`🔄 Restore to Board`).
-
----
-
-### ☁️ 13. Dual-Mode Cloud Sync & Session-Safe Architecture
-- **Cloud Mode**: Real-time cloud sync with Supabase PostgreSQL, GoTrue / Google OAuth authentication, and Row Level Security (RLS).
-- **Guest / In-Session Mode**: 100% functional without an account or internet connection using browser `sessionStorage`. Zero sample/demo data is injected — guests start with an empty slate and can export their data as JSON anytime.
-- **Zero-Loss Migration**: JSON import/export functionality for effortless data portability and backups.
-- **Forward-Compatible Metadata Engine**: Custom metadata serialization (`<!-- CT_META: ... :CT_META -->`) ensures all global fields persist cleanly to PostgreSQL text fields without requiring destructive database schema alterations.
-
----
-
-## 🛠️ Tech Stack
-
-| Domain | Technologies |
-|---|---|
-| **Frontend Framework** | [React 19](https://react.dev/), [Vite 8](https://vitejs.dev/) |
-| **Icons & UI Micro-Interactions** | [Lucide React](https://lucide.dev/), [Canvas Confetti](https://www.npmjs.com/package/canvas-confetti) |
-| **Data Visualization** | [Recharts](https://recharts.org/) |
-| **Database & Auth** | [Supabase](https://supabase.com/) (Managed PostgreSQL, GoTrue Auth, Row-Level Security, Storage) |
-| **Code Quality & Linting** | [Oxlint](https://oxc.rs/) |
-| **Deployment & Hosting** | [Vercel](https://vercel.com/) (Continuous Deployment from GitHub `main`) |
-
----
-
-## 🏗️ Architecture & Database Schema
-
-The cloud database is powered by Supabase PostgreSQL with strict Row Level Security (RLS).
-
-### Database Tables:
-* **`public.applications`**:
-  * `id` (`TEXT PRIMARY KEY`): Unique application identifier.
-  * `user_id` (`UUID NOT NULL REFERENCES auth.users`): Foreign key linked to authenticated user.
-  * `company`, `title`, `location`, `work_type`, `status`, `priority`
-  * `salary_min`, `salary_max`, `currency`, `applied_date`, `job_url`
-  * `archived` (`BOOLEAN`), `archived_at` (`TIMESTAMPTZ`) (safe soft-deletion)
-  * `contact_name`, `contact_email`, `resume_version`
-  * `tags` (`JSONB`), `timeline` (`JSONB`), `interviews` (`JSONB`), `notes` (`TEXT`)
-  * `created_at`, `updated_at` (automatic trigger via `handle_updated_at()`)
-
-### Security Model:
-* RLS policies restrict all `SELECT`, `INSERT`, `UPDATE`, and `DELETE` queries strictly to `auth.uid() = user_id`.
-
-The full schema migration script is located at [`supabase/schema.sql`](supabase/schema.sql).
-
----
-
-## 🚀 Getting Started Locally
-
-### 1. Clone the repository
 ```bash
 git clone https://github.com/anshuln26/Job-Application-Tracker.git
 cd Job-Application-Tracker
-```
-
-### 2. Install dependencies
-```bash
 npm install
-```
-
-### 3. Configure Environment Variables (Optional)
-Create a `.env` file in the project root:
-```env
-VITE_SUPABASE_URL=https://your-project-ref.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-or-publishable-key
-VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-or-publishable-key
-```
-
-*(Note: If `.env` is omitted, the application operates in 100% offline LocalStorage mode).*
-
-### 4. Start the development server
-```bash
 npm run dev
 ```
 
-Visit `http://localhost:5173` in your browser.
+The app runs in demo-only mode without any configuration. To enable accounts:
 
-### 5. Build for production
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In the SQL editor, run [`supabase/schema.sql`](supabase/schema.sql).
+3. Copy `.env.example` to `.env.local` and fill in your project URL and anon key.
+4. In **Authentication → URL Configuration**, add `http://localhost:5173/**` (and your production URL) to the redirect URLs.
+5. Optional: enable **Google** under **Authentication → Providers**.
+
 ```bash
-npm run build
+npm test          # unit tests
+npm run typecheck # TypeScript
+npm run lint      # oxlint
+npm run build     # production build
 ```
 
----
+## License
 
-## 🚢 Continuous Deployment
-
-This project is configured for one-click continuous deployment with **Vercel** ([`vercel.json`](vercel.json)) and **Netlify** ([`netlify.toml`](netlify.toml)).
-
-1. Every commit pushed to `origin/main` automatically triggers a production build on Vercel.
-2. Production environment variables (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) are injected during build time.
-
----
-
-<div align="center">
-
-### Developed with ❤️ by [Anshul](https://github.com/anshuln26)
-
-*Crafted with love and maintained by [Anshul](https://github.com/anshuln26) • © 2026 All Rights Reserved*
-
-</div>
+[MIT](LICENSE)
