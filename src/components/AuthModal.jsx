@@ -26,6 +26,10 @@ import {
   updateUserPassword,
   signInWithGoogle
 } from '../lib/authService';
+import { getSupabaseConfig } from '../lib/supabaseClient';
+
+const supabaseUrl = getSupabaseConfig().url.replace(/\/$/, '');
+const supabaseRef = supabaseUrl.replace(/^https?:\/\//, '').split('.')[0];
 
 export default function AuthModal({
   isOpen,
@@ -211,7 +215,7 @@ export default function AuthModal({
     setLoading(true);
 
     try {
-      const res = await verifySignupCode(email, fullCode, password);
+      const res = await verifySignupCode(email, fullCode);
       if (res.success) {
         showToast?.('Email verified successfully! Welcome aboard.');
         if (res.user) {
@@ -1535,7 +1539,7 @@ export default function AuthModal({
                 Google OAuth Activation Required
               </h3>
               <p style={{ fontSize: '0.825rem', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
-                In your Supabase project (<strong>qajgoopmdnntxdebsqob</strong>), Google provider requires OAuth credentials.
+                In your Supabase project (<strong>{supabaseRef}</strong>), Google provider requires OAuth credentials.
               </p>
             </div>
 
@@ -1547,7 +1551,7 @@ export default function AuthModal({
                 <li>Create an OAuth 2.0 Client ID in Google Cloud Console.</li>
                 <li>Set Authorized Redirect URI to:<br />
                   <code style={{ fontSize: '0.725rem', background: 'var(--bg-base)', padding: '2px 4px', borderRadius: '4px', wordBreak: 'break-all' }}>
-                    https://qajgoopmdnntxdebsqob.supabase.co/auth/v1/callback
+                    {supabaseUrl}/auth/v1/callback
                   </code>
                 </li>
                 <li>In Supabase Dashboard → <strong>Authentication</strong> → <strong>Providers</strong> → <strong>Google</strong>: Toggle ON and paste your Client ID & Secret.</li>
@@ -1555,7 +1559,7 @@ export default function AuthModal({
             </div>
 
             <a
-              href="https://supabase.com/dashboard/project/qajgoopmdnntxdebsqob/auth/providers"
+              href={`https://supabase.com/dashboard/project/${supabaseRef}/auth/providers`}
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-secondary"

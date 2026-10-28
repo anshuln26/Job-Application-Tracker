@@ -44,31 +44,38 @@ ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS resume_curation TEXT DE
 ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS salary_undisclosed BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS archived BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+ALTER TABLE public.applications ADD COLUMN IF NOT EXISTS user_email TEXT;
+CREATE INDEX IF NOT EXISTS applications_user_id_idx ON public.applications (user_id);
 
 -- 3. RLS Policies: Ensure users can only access their own data
 DROP POLICY IF EXISTS "Users can view their own applications" ON public.applications;
 CREATE POLICY "Users can view their own applications"
   ON public.applications
   FOR SELECT
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id);
 
 DROP POLICY IF EXISTS "Users can insert their own applications" ON public.applications;
 CREATE POLICY "Users can insert their own applications"
   ON public.applications
   FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+  TO authenticated
+  WITH CHECK ((select auth.uid()) = user_id);
 
 DROP POLICY IF EXISTS "Users can update their own applications" ON public.applications;
 CREATE POLICY "Users can update their own applications"
   ON public.applications
   FOR UPDATE
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
 
 DROP POLICY IF EXISTS "Users can delete their own applications" ON public.applications;
 CREATE POLICY "Users can delete their own applications"
   ON public.applications
   FOR DELETE
-  USING (auth.uid() = user_id);
+  TO authenticated
+  USING ((select auth.uid()) = user_id);
 
 -- 4. Automatic Timestamp Update Trigger
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
@@ -77,7 +84,7 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = '';
 
 DROP TRIGGER IF EXISTS trigger_applications_updated_at ON public.applications;
 CREATE TRIGGER trigger_applications_updated_at
@@ -87,8 +94,8 @@ CREATE TRIGGER trigger_applications_updated_at
 
 -- 5. Storage Bucket for Resumes (Optional document uploads)
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('resumes', 'resumes', true)
-ON CONFLICT (id) DO NOTHING;
+VALUES ('resumes', 'resumes', false)
+ON CONFLICT (id) DO UPDATE SET public = false;
 
 DROP POLICY IF EXISTS "Authenticated users can upload resumes" ON storage.objects;
 CREATE POLICY "Authenticated users can upload resumes"
@@ -98,7 +105,13 @@ CREATE POLICY "Authenticated users can upload resumes"
   WITH CHECK (bucket_id = 'resumes' AND auth.uid() = owner);
 
 DROP POLICY IF EXISTS "Anyone can view resumes" ON storage.objects;
-CREATE POLICY "Anyone can view resumes"
+DROP POLICY IF EXISTS "Users can view their own resumes" ON storage.objects;
+CREATE POLICY "Users can view their own resumes"
   ON storage.objects
   FOR SELECT
-  USING (bucket_id = 'resumes');
+  TO authenticated
+  USING (bucket_id = 'resumes' AND (select auth.uid()) = owner);
+
+-- 6. Auth: signup verification and password reset use Supabase's built-in OTP
+-- (supabase.auth.verifyOtp). Add {{ .Token }} to the "Confirm signup" and
+-- "Reset password" email templates so users receive the 6-digit code.

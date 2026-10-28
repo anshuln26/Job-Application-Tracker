@@ -1,8 +1,7 @@
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { supabase, isSupabaseConfigured, getSupabaseConfig } from './supabaseClient';
 
 const USERS_DB_KEY = 'careertrack_users_registry_v2';
 const SESSION_KEY = 'careertrack_active_session_v2';
-const PENDING_VERIFICATION_KEY = 'careertrack_pending_verification';
 
 // In-memory listeners for reactive auth state changes
 const authListeners = new Set();
@@ -15,18 +14,6 @@ const notifyListeners = (user) => {
       console.error('Auth listener error:', e);
     }
   });
-};
-
-/**
- * Generate cryptographically sound 6-digit OTP code
- */
-export const generate6DigitCode = () => {
-  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
-    const arr = new Uint32Array(1);
-    crypto.getRandomValues(arr);
-    return (100000 + (arr[0] % 900000)).toString();
-  }
-  return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
 /**
@@ -192,7 +179,7 @@ export const signInWithEmail = async (email, password) => {
 };
 
 /**
- * Sign Up with Name, Email & Password (Dispatches 6-digit verification code)
+ * Sign Up with Name, Email & Password (Supabase emails a 6-digit verification code)
  */
 export const signUpWithEmail = async (name, email, password) => {
   const cleanEmail = email.trim().toLowerCase();
@@ -205,53 +192,24 @@ export const signUpWithEmail = async (name, email, password) => {
     return { success: false, error: 'Password must be at least 6 characters long.' };
   }
 
-  // Generate 6-digit verification code
-  const otpCode = generate6DigitCode();
-
-  // 1. Register with Supabase
-  if (supabase && isSupabaseConfigured()) {
-    try {
-      const { error } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: {
-          data: {
-            full_name: cleanName,
-            avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}`
-          }
-        }
-      });
-
-      // Even if user already registered or needs confirmation
-      if (error && !error.message?.includes('already registered')) {
-        console.warn('Supabase signUp notice:', error.message);
-      }
-
-      // Store 6-digit verification code in Supabase database
-      const { error: rpcErr } = await supabase.rpc('create_verification_code', {
-        p_email: cleanEmail,
-        p_code: otpCode,
-        p_type: 'signup'
-      });
-
-      if (rpcErr) {
-        console.warn('RPC create_verification_code notice:', rpcErr);
-      }
-    } catch (err) {
-      console.warn('Supabase cloud signup exception:', err);
-    }
+  if (!supabase || !isSupabaseConfigured()) {
+    return { success: false, error: 'Database service is unavailable.' };
   }
 
-  // Cache pending verification locally so password is known for auto-login after code verification
-  localStorage.setItem(
-    PENDING_VERIFICATION_KEY,
-    JSON.stringify({
-      email: cleanEmail,
-      name: cleanName,
-      password,
-      createdAt: Date.now()
-    })
-  );
+  const { error } = await supabase.auth.signUp({
+    email: cleanEmail,
+    password,
+    options: {
+      data: {
+        full_name: cleanName,
+        avatar_url: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}`
+      }
+    }
+  });
+
+  if (error && !error.message?.includes('already registered')) {
+    return { success: false, error: error.message };
+  }
 
   return {
     success: true,
@@ -266,18 +224,14 @@ export const signUpWithEmail = async (name, email, password) => {
  */
 export const resendVerificationCode = async (email, type = 'signup') => {
   const cleanEmail = email.trim().toLowerCase();
-  const newOtp = generate6DigitCode();
 
   if (supabase && isSupabaseConfigured()) {
     try {
-      await supabase.rpc('create_verification_code', {
-        p_email: cleanEmail,
-        p_code: newOtp,
-        p_type: type
-      });
       if (type === 'recovery') {
         const redirectUrl = typeof window !== 'undefined' ? window.location.origin : undefined;
         await supabase.auth.resetPasswordForEmail(cleanEmail, { redirectTo: redirectUrl });
+      } else {
+        await supabase.auth.resend({ type: 'signup', email: cleanEmail });
       }
     } catch (e) {
       console.warn('Failed to resend cloud code:', e);
@@ -287,80 +241,55 @@ export const resendVerificationCode = async (email, type = 'signup') => {
   return { success: true };
 };
 
+const toUserObj = (user, fallbackEmail) => {
+  const email = (user.email || fallbackEmail).toLowerCase().trim();
+  const name = user.user_metadata?.full_name || email.split('@')[0];
+  return {
+    id: user.id,
+    email,
+    name,
+    avatar: user.user_metadata?.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`,
+    authProvider: 'email',
+    isCloud: true
+  };
+};
+
 /**
  * Verify 6-Digit Signup Code & Activate Account
  */
-export const verifySignupCode = async (email, code, passwordOverride = null) => {
+export const verifySignupCode = async (email, code) => {
   const cleanEmail = email.trim().toLowerCase();
   const cleanCode = code.trim();
 
-  let pendingPassword = passwordOverride;
-  let pendingName = cleanEmail.split('@')[0];
-
-  try {
-    const raw = localStorage.getItem(PENDING_VERIFICATION_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.email === cleanEmail) {
-        pendingPassword = pendingPassword || parsed.password;
-        pendingName = parsed.name || pendingName;
-      }
-    }
-  } catch {}
-
-  // 1. Verify via Supabase RPC
   if (supabase && isSupabaseConfigured()) {
-    try {
-      const { data, error } = await supabase.rpc('verify_signup_code', {
-        p_email: cleanEmail,
-        p_code: cleanCode
-      });
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: cleanEmail,
+      token: cleanCode,
+      type: 'signup'
+    });
 
-      if (error) throw error;
-      if (!data?.success) {
-        return { success: false, error: data?.error || 'Invalid or expired 6-digit code.' };
-      }
-
-      // If we have password, perform automatic cloud login
-      if (pendingPassword) {
-        const loginRes = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: pendingPassword
-        });
-
-        if (loginRes.data?.user) {
-          const userObj = {
-            id: loginRes.data.user.id,
-            email: cleanEmail,
-            name: pendingName,
-            avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(pendingName)}`,
-            authProvider: 'email',
-            isCloud: true
-          };
-          setActiveUserSession(userObj);
-          localStorage.removeItem(PENDING_VERIFICATION_KEY);
-          return { success: true, user: userObj };
-        }
-      }
-
-      // If password not in memory, user is verified and can sign in
-      localStorage.removeItem(PENDING_VERIFICATION_KEY);
-      return {
-        success: true,
-        needsLogin: true,
-        message: 'Email successfully verified! Please sign in with your credentials.'
-      };
-    } catch (err) {
-      console.warn('Supabase verification error:', err);
-      return { success: false, error: err.message || 'Verification failed. Please try again.' };
+    if (error) {
+      return { success: false, error: error.message || 'Invalid or expired 6-digit code.' };
     }
+
+    if (data?.user && data?.session) {
+      const userObj = toUserObj(data.user, cleanEmail);
+      setActiveUserSession(userObj);
+      return { success: true, user: userObj };
+    }
+
+    return {
+      success: true,
+      needsLogin: true,
+      message: 'Email successfully verified! Please sign in with your credentials.'
+    };
   }
 
   return { success: false, error: 'Database service is unavailable.' };
 };
 
 /**
- * Request Password Reset (Dispatches Secure Reset Email & Recovery Code)
+ * Request Password Reset (Supabase emails a reset link and 6-digit recovery code)
  */
 export const requestPasswordReset = async (email) => {
   const cleanEmail = email.trim().toLowerCase();
@@ -368,30 +297,15 @@ export const requestPasswordReset = async (email) => {
     return { success: false, error: 'Please enter a valid email address.' };
   }
 
-  const recoveryCode = generate6DigitCode();
-
   if (supabase && isSupabaseConfigured()) {
-    try {
-      // 1. Create recovery code in Supabase DB for 6-digit verification
-      const { error: rpcErr } = await supabase.rpc('create_verification_code', {
-        p_email: cleanEmail,
-        p_code: recoveryCode,
-        p_type: 'recovery'
-      });
-      if (rpcErr) console.warn('RPC create recovery code error:', rpcErr);
-
-      // 2. Dispatch official Supabase reset email with link
-      const redirectUrl = typeof window !== 'undefined' ? window.location.origin : undefined;
-      const { error: emailErr } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: redirectUrl
-      });
-      if (emailErr) console.warn('Supabase resetPasswordForEmail notice:', emailErr.message);
-    } catch (e) {
-      console.warn('Supabase recovery request error:', e);
-    }
+    const redirectUrl = typeof window !== 'undefined' ? window.location.origin : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+      redirectTo: redirectUrl
+    });
+    if (error) console.warn('Supabase resetPasswordForEmail notice:', error.message);
   }
 
-  // Pure security: Never expose the recovery code to the client
+  // Always report success so the form can't be used to probe which emails exist
   return {
     success: true,
     email: cleanEmail
@@ -449,41 +363,22 @@ export const verifyAndResetPassword = async (email, code, newPassword) => {
 
   if (supabase && isSupabaseConfigured()) {
     try {
-      const { data, error } = await supabase.rpc('verify_reset_password_code', {
-        p_email: cleanEmail,
-        p_code: cleanCode,
-        p_new_password: newPassword
-      });
-
-      if (error) throw error;
-      if (!data?.success) {
-        return { success: false, error: data?.error || 'Invalid or expired 6-digit code.' };
-      }
-
-      // Automatically sign in with the new password
-      const loginRes = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.verifyOtp({
         email: cleanEmail,
-        password: newPassword
+        token: cleanCode,
+        type: 'recovery'
       });
-
-      if (loginRes.data?.user) {
-        const userObj = {
-          id: loginRes.data.user.id,
-          email: cleanEmail,
-          name: cleanEmail.split('@')[0],
-          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanEmail)}`,
-          authProvider: 'email',
-          isCloud: true
-        };
-        setActiveUserSession(userObj);
-        return { success: true, user: userObj, message: 'Password reset successfully!' };
+      if (error) throw error;
+      if (!data?.session) {
+        return { success: false, error: 'Invalid or expired 6-digit code.' };
       }
 
-      return {
-        success: true,
-        needsLogin: true,
-        message: 'Password reset successfully! Please sign in with your new password.'
-      };
+      const { data: updated, error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) throw updateErr;
+
+      const userObj = toUserObj(updated.user, cleanEmail);
+      setActiveUserSession(userObj);
+      return { success: true, user: userObj, message: 'Password reset successfully!' };
     } catch (err) {
       console.warn('Supabase password reset error:', err);
       return { success: false, error: err.message || 'Failed to reset password.' };
@@ -502,7 +397,7 @@ export const signInWithGoogle = async () => {
       // 1. Pre-flight probe to ensure Supabase Google Provider is configured and active
       // Prevents browser top-level navigation into raw 400 JSON screen
       try {
-        const probe = await fetch('https://qajgoopmdnntxdebsqob.supabase.co/auth/v1/authorize?provider=google');
+        const probe = await fetch(`${getSupabaseConfig().url.replace(/\/$/, '')}/auth/v1/authorize?provider=google`);
         if (!probe.ok) {
           const probeJson = await probe.json().catch(() => ({}));
           if (probeJson.msg?.includes('provider is not enabled')) {
@@ -567,7 +462,7 @@ export const signOut = async () => {
         localStorage.removeItem(k);
       }
     }
-  } catch (cleanErr) {
+  } catch {
     // Ignore storage iteration errors
   }
 
