@@ -116,5 +116,17 @@ export function useMoveApplication() {
     };
     if (status === 'applied' && !app.appliedDate) patch.appliedDate = today;
     update.mutate({ id: app.id, patch });
+    if (status === 'offer') celebrate();
   };
+}
+
+/** A little confetti when an offer lands. */
+export function celebrate() {
+  if (typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  import('canvas-confetti').then(({ default: confetti }) => {
+    const colors = ['#5b5bf0', '#a855f7', '#ec4899', '#22d3ee', '#facc15'];
+    confetti({ particleCount: 90, spread: 75, origin: { y: 0.65 }, colors });
+    setTimeout(() => confetti({ particleCount: 50, angle: 60, spread: 60, origin: { x: 0 }, colors }), 180);
+    setTimeout(() => confetti({ particleCount: 50, angle: 120, spread: 60, origin: { x: 1 }, colors }), 300);
+  });
 }

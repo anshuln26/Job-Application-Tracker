@@ -12,10 +12,14 @@ import {
   Link2,
   Mail,
   MoreHorizontal,
+  HandCoins,
   Pencil,
+  UserPlus,
   Plus,
   Trash2,
 } from 'lucide-react';
+import { useContacts } from '@/hooks/useContacts';
+import { ContactDialog, RELATIONSHIPS } from '@/components/contacts/ContactDialog';
 import { useApplication, useDeleteApplication, useMoveApplication, useUpdateApplication } from '@/hooks/useApplications';
 import { usePreferences } from '@/hooks/usePreferences';
 import { useApplicationDialogs } from '@/components/applications/ApplicationDialogs';
@@ -122,6 +126,13 @@ function Detail({ app }: { app: Application }) {
                 <ExternalLink className="size-4" /> Posting
               </Button>
             </a>
+          )}
+          {app.status === 'offer' && (
+            <Link to="/app/offers">
+              <Button variant="secondary">
+                <HandCoins className="size-4" /> Compare offers
+              </Button>
+            </Link>
           )}
           <Button variant="secondary" onClick={() => openEdit(app)}>
             <Pencil className="size-4" /> Edit
@@ -235,6 +246,8 @@ function Detail({ app }: { app: Application }) {
             </Card>
           )}
 
+          <LinkedContacts app={app} />
+
           <Card className="p-5">
             <h2 className="mb-4 text-sm font-semibold">Timeline</h2>
             <Timeline app={app} onChange={(timeline) => patch({ timeline })} />
@@ -299,7 +312,7 @@ function Notes({ app, onSave }: { app: Application; onSave: (notes: string) => v
         onChange={(e) => setValue(e.target.value)}
         onBlur={() => dirty && onSave(value)}
         placeholder="Interview prep, questions to ask, salary expectations…"
-        className="min-h-32 border-transparent bg-surface-2/60 shadow-none focus:bg-surface"
+        className="min-h-32 border-transparent bg-fg/[0.03] shadow-none focus:bg-surface/80"
       />
     </Card>
   );
@@ -440,5 +453,49 @@ function Timeline({ app, onChange }: { app: Application; onChange: (list: Timeli
         </ol>
       )}
     </>
+  );
+}
+
+function LinkedContacts({ app }: { app: Application }) {
+  const { data: contacts = [] } = useContacts();
+  const [open, setOpen] = useState(false);
+  const linked = contacts.filter((c) => c.applicationIds.includes(app.id));
+  return (
+    <Card className="p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold">People</h2>
+        <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+          <UserPlus className="size-3.5" /> Add
+        </Button>
+      </div>
+      {linked.length === 0 ? (
+        <p className="text-sm text-muted">Add the recruiter, referrer or hiring manager for this role to track follow-ups.</p>
+      ) : (
+        <ul className="space-y-2">
+          {linked.map((c) => (
+            <li key={c.id}>
+              <Link to="/app/contacts" className="glass-soft lift flex items-center gap-3 rounded-xl p-2.5">
+                <span className="bg-gradient-accent grid size-8 shrink-0 place-items-center rounded-xl text-[11px] font-semibold text-white">
+                  {c.name
+                    .split(' ')
+                    .map((w) => w[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{c.name}</div>
+                  <div className="truncate text-xs text-muted">
+                    {RELATIONSHIPS.find((r) => r.id === c.relationship)?.label}
+                    {c.nextFollowUp ? ` · follow up ${relativeDays(c.nextFollowUp)}` : ''}
+                  </div>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      <ContactDialog open={open} onClose={() => setOpen(false)} initial={{ company: app.company, applicationIds: [app.id] }} />
+    </Card>
   );
 }

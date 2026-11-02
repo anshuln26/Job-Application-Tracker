@@ -126,7 +126,7 @@ export default function Calendar() {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-border bg-border">
+          <div className="grid grid-cols-7 gap-px overflow-hidden rounded-xl border border-border/60 bg-border/50">
             {days.map((d) => {
               const evs = onDay(d);
               const isSel = isSameDay(d, selected);
@@ -138,8 +138,8 @@ export default function Calendar() {
                   aria-label={`${format(d, 'd MMMM')}, ${evs.length} events`}
                   aria-pressed={isSel}
                   className={cn(
-                    'flex min-h-14 flex-col items-stretch gap-1 bg-surface p-1 text-left sm:min-h-24 sm:p-1.5',
-                    !isSameMonth(d, month) && 'bg-surface-2/50 text-subtle',
+                    'flex min-h-14 flex-col items-stretch gap-1 bg-surface/70 p-1 text-left transition hover:bg-surface sm:min-h-24 sm:p-1.5',
+                    !isSameMonth(d, month) && 'bg-surface/30 text-subtle',
                     isSel && 'ring-2 ring-inset ring-accent',
                   )}
                 >

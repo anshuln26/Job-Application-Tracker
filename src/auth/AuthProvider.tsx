@@ -2,20 +2,42 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { Session, User } from '@supabase/supabase-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { localRepository, resetDemoData, supabaseRepository, type Repository } from '@/data/repository';
+import {
+  localContacts,
+  localRepository,
+  localSettings,
+  resetDemoData,
+  supabaseContacts,
+  supabaseRepository,
+  supabaseSettings,
+  type ContactsRepository,
+  type Repository,
+  type SettingsRepository,
+} from '@/data/repository';
 
-type Status = 'loading' | 'signed-out' | 'signed-in' | 'demo';
+type Status = 'loading' | 'signed-out' | 'signed-in' | 'needs-2fa' | 'demo';
+
+export interface SecondFactor {
+  totp: boolean;
+  email: boolean;
+  satisfied: boolean;
+}
 
 interface AuthState {
   status: Status;
   user: User | null;
+  session: Session | null;
   /** True after the user opened a password-recovery link and must choose a new password */
   recovering: boolean;
+  secondFactor: SecondFactor | null;
   repository: Repository | null;
+  contacts: ContactsRepository | null;
+  settings: SettingsRepository | null;
   displayName: string;
   enterDemo: () => void;
   signOut: () => Promise<void>;
   clearRecovery: () => void;
+  refreshSecondFactor: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -25,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(Boolean(supabase));
+  const [secondFactor, setSecondFactor] = useState<SecondFactor | null>(null);
   const [demo, setDemo] = useState(() => {
     try {
       return sessionStorage.getItem(DEMO_FLAG) === '1';
@@ -34,19 +57,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const [recovering, setRecovering] = useState(false);
 
+  const refreshSecondFactor = useCallback(async () => {
+    if (!supabase) return;
+    const { data, error } = await supabase.rpc('second_factor_status');
+    // If the check itself is unavailable, don't lock people out — the database still enforces 2FA.
+    setSecondFactor(error || !data ? { totp: false, email: false, satisfied: true } : (data as SecondFactor));
+  }, []);
+
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      setLoading(false);
+      if (!data.session) setLoading(false);
     });
     const { data } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
       if (event === 'PASSWORD_RECOVERY') setRecovering(true);
-      if (event === 'SIGNED_OUT') queryClient.clear();
+      if (event === 'SIGNED_OUT') {
+        setSecondFactor(null);
+        queryClient.clear();
+      }
+      if (event === 'MFA_CHALLENGE_VERIFIED') queryClient.invalidateQueries();
     });
     return () => data.subscription.unsubscribe();
   }, [queryClient]);
+
+  // Re-check the second factor whenever the session (and so its assurance level) changes
+  const sessionKey = session ? `${session.user.id}:${session.access_token.slice(-16)}` : null;
+  useEffect(() => {
+    if (!sessionKey) return;
+    let cancelled = false;
+    // Syncing with Supabase: the state update happens after the request resolves
+    // eslint-disable-next-line react/set-state-in-effect
+    refreshSecondFactor().finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionKey, refreshSecondFactor]);
 
   const user = session?.user ?? null;
 
@@ -61,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const signOut = useCallback(async () => {
-    if (demo) {
+    if (demo && !user) {
       try {
         sessionStorage.removeItem(DEMO_FLAG);
         resetDemoData();
@@ -73,14 +120,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     await supabase?.auth.signOut();
-  }, [demo, queryClient]);
+  }, [demo, user, queryClient]);
 
-  const status: Status = loading ? 'loading' : user ? 'signed-in' : demo ? 'demo' : 'signed-out';
+  const status: Status = loading
+    ? 'loading'
+    : user
+      ? secondFactor === null
+        ? 'loading'
+        : secondFactor.satisfied
+          ? 'signed-in'
+          : 'needs-2fa'
+      : demo
+        ? 'demo'
+        : 'signed-out';
 
-  const repository = useMemo(() => {
-    if (status === 'signed-in' && user) return supabaseRepository(user.id);
-    if (status === 'demo') return localRepository();
-    return null;
+  const repos = useMemo(() => {
+    if (status === 'signed-in' && user)
+      return { repository: supabaseRepository(user.id), contacts: supabaseContacts(user.id), settings: supabaseSettings(user.id) };
+    if (status === 'demo') return { repository: localRepository(), contacts: localContacts(), settings: localSettings() };
+    return { repository: null, contacts: null, settings: null };
   }, [status, user]);
 
   const displayName =
@@ -94,12 +152,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value: AuthState = {
     status,
     user,
+    session,
     recovering,
-    repository,
+    secondFactor,
+    ...repos,
     displayName,
     enterDemo,
     signOut,
     clearRecovery: () => setRecovering(false),
+    refreshSecondFactor,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
