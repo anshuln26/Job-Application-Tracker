@@ -94,8 +94,8 @@ function Column({ stage, apps, onAdd }: { stage: StageMeta; apps: Application[];
       ref={setNodeRef}
       aria-label={stage.label}
       className={cn(
-        'flex w-72 shrink-0 snap-start flex-col rounded-xl border border-transparent bg-surface-2/60 p-2 transition',
-        isOver && 'border-accent bg-accent-soft',
+        'glass-soft flex w-72 shrink-0 snap-start flex-col rounded-2xl p-2 transition',
+        isOver && 'ring-gradient bg-accent-soft/60',
       )}
     >
       <header className="flex items-center gap-2 px-1.5 pb-2 pt-1">
@@ -149,8 +149,8 @@ function CardBody({ app, lifted }: { app: Application; lifted?: boolean }) {
   return (
     <article
       className={cn(
-        'rounded-lg border border-border bg-surface p-3 shadow-sm transition hover:border-accent/40',
-        lifted && 'rotate-2 shadow-xl ring-2 ring-accent/40',
+        'glass lift rounded-xl p-3',
+        lifted && 'ring-gradient rotate-2 shadow-2xl',
       )}
     >
       <div className="flex items-start gap-2.5">

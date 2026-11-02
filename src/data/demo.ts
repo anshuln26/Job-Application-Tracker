@@ -1,5 +1,5 @@
 import { addDays, format, formatISO } from 'date-fns';
-import type { Application } from '@/types';
+import type { Application, Contact } from '@/types';
 import { emptyApplication } from './mappers';
 
 /** Sample data for the public demo. Dates are relative to today so the demo always looks current. */
@@ -27,11 +27,31 @@ export function createDemoApplications(today = new Date()): Application[] {
       referralStatus: 'referral_received',
       referralContact: 'Priya Raman',
       referralRole: 'Staff Engineer',
+      offerDetails: { base: 3800000, bonus: 380000, joiningBonus: 300000, stocks: 600000, other: 50000, basicPercent: 50, pf: true, foreignTaxPercent: null, notes: 'RSUs vest over 4 years' },
       timeline: [
         { id: 't1', date: d(-38), stage: 'Applied', notes: 'Referred by Priya.' },
         { id: 't2', date: d(-30), stage: 'Recruiter screen' },
         { id: 't3', date: d(-20), stage: 'Onsite loop', notes: '4 rounds incl. system design.' },
         { id: 't4', date: d(-4), stage: 'Offer' },
+      ],
+    },
+    {
+      company: 'Flipkart',
+      title: 'SDE II, Supply Chain',
+      status: 'offer',
+      priority: 'medium',
+      location: 'Bengaluru, India',
+      workType: 'On-site',
+      source: 'Recruiter',
+      salaryMin: 3200000,
+      salaryMax: 3600000,
+      currency: 'INR',
+      appliedDate: d(-34),
+      deadline: d(9),
+      offerDetails: { base: 3400000, bonus: 340000, joiningBonus: 500000, stocks: 400000, other: 40000, basicPercent: 40, pf: true, foreignTaxPercent: null, notes: '' },
+      timeline: [
+        { id: 't1', date: d(-34), stage: 'Applied' },
+        { id: 't2', date: d(-6), stage: 'Offer' },
       ],
     },
     {
@@ -95,7 +115,7 @@ export function createDemoApplications(today = new Date()): Application[] {
       location: 'Remote',
       workType: 'Remote',
       source: 'Company site',
-      appliedDate: d(-5),
+      appliedDate: d(0),
       salaryUndisclosed: true,
       tags: ['Next.js'],
       resumeCuration: 'curated',
@@ -112,7 +132,7 @@ export function createDemoApplications(today = new Date()): Application[] {
       salaryMax: 100000,
       salaryPeriod: 'monthly',
       currency: 'INR',
-      appliedDate: d(-3),
+      appliedDate: d(0),
       tags: ['Internship'],
     },
     {
@@ -178,4 +198,64 @@ export function createDemoApplications(today = new Date()): Application[] {
     createdAt: ts(-(40 - i)),
     updatedAt: ts(-i),
   }));
+}
+
+export function createDemoContacts(today = new Date()): Contact[] {
+  const d = (offset: number) => format(addDays(today, offset), 'yyyy-MM-dd');
+  const now = formatISO(today);
+  const rows: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>[] = [
+    {
+      name: 'Priya Raman',
+      company: 'Stripe',
+      role: 'Staff Engineer',
+      relationship: 'referrer',
+      email: 'priya@example.com',
+      phone: '',
+      linkedin: 'https://www.linkedin.com/in/example-priya',
+      notes: 'Ex-colleague from college. Referred me for the Dashboard team.',
+      applicationIds: ['demo-1'],
+      lastContacted: d(-4),
+      nextFollowUp: d(3),
+    },
+    {
+      name: 'Marcus Vance',
+      company: 'OpenAI',
+      role: 'Engineering Manager',
+      relationship: 'referrer',
+      email: '',
+      phone: '',
+      linkedin: 'https://www.linkedin.com/in/example-marcus',
+      notes: 'Connected after the WebGPU meetup. Asked for a referral.',
+      applicationIds: ['demo-8'],
+      lastContacted: d(-2),
+      nextFollowUp: d(0),
+    },
+    {
+      name: 'Ananya Sharma',
+      company: 'Razorpay',
+      role: 'Technical Recruiter',
+      relationship: 'recruiter',
+      email: 'ananya@example.com',
+      phone: '+91 98765 43210',
+      linkedin: '',
+      notes: 'Prefers WhatsApp for scheduling.',
+      applicationIds: ['demo-4'],
+      lastContacted: d(-6),
+      nextFollowUp: d(-1),
+    },
+    {
+      name: 'Rohit Mehta',
+      company: 'Flipkart',
+      role: 'Hiring Manager',
+      relationship: 'hiring_manager',
+      email: '',
+      phone: '',
+      linkedin: '',
+      notes: 'Team lead for Supply Chain. Asked about start date flexibility.',
+      applicationIds: ['demo-2'],
+      lastContacted: d(-6),
+      nextFollowUp: null,
+    },
+  ];
+  return rows.map((r, i) => ({ ...r, id: `demo-contact-${i + 1}`, createdAt: now, updatedAt: now }));
 }

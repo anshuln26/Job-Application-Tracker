@@ -46,6 +46,7 @@ export interface ApplicationRow {
   notes: string | null;
   timeline: unknown;
   interviews: unknown;
+  offer_details: unknown;
   archived: boolean | null;
   archived_at: string | null;
   created_at: string;
@@ -123,6 +124,7 @@ export function fromRow(row: ApplicationRow): Application {
     notes,
     timeline: arr(row.timeline),
     interviews: arr(row.interviews),
+    offerDetails: row.offer_details && typeof row.offer_details === 'object' ? (row.offer_details as Application['offerDetails']) : null,
     archived: Boolean(row.archived),
     archivedAt: row.archived_at,
     createdAt: row.created_at,
@@ -168,6 +170,7 @@ export function toRow(app: Partial<ApplicationInput>): Partial<ApplicationRow> {
   if (app.notes !== undefined) set('notes', app.notes);
   if (app.timeline !== undefined) set('timeline', app.timeline);
   if (app.interviews !== undefined) set('interviews', app.interviews);
+  if (app.offerDetails !== undefined) set('offer_details', app.offerDetails);
   if (app.archived !== undefined) set('archived', app.archived);
   if (app.archivedAt !== undefined) set('archived_at', app.archivedAt);
   return row;
@@ -206,6 +209,7 @@ export function emptyApplication(overrides: Partial<ApplicationInput> = {}): App
     notes: '',
     timeline: [],
     interviews: [],
+    offerDetails: null,
     archived: false,
     archivedAt: null,
     ...overrides,

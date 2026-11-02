@@ -66,6 +66,8 @@ export interface Application {
   timeline: TimelineEvent[];
   interviews: Interview[];
 
+  offerDetails: OfferDetails | null;
+
   archived: boolean;
   archivedAt: string | null;
   createdAt: string;
@@ -73,3 +75,52 @@ export interface Application {
 }
 
 export type ApplicationInput = Omit<Application, 'id' | 'createdAt' | 'updatedAt'>;
+
+export interface OfferDetails {
+  /** Annual fixed / base pay */
+  base: number | null;
+  /** Annual variable / performance bonus (target) */
+  bonus: number | null;
+  joiningBonus: number | null;
+  /** Annual value of stock / ESOP vesting */
+  stocks: number | null;
+  /** Other annual benefits counted in CTC (insurance, allowances…) */
+  other: number | null;
+  /** Basic pay as a % of fixed pay — drives PF */
+  basicPercent: number;
+  /** Whether 12% employee PF is deducted from in-hand */
+  pf: boolean;
+  /** Estimated effective tax % for offers outside India */
+  foreignTaxPercent: number | null;
+  notes: string;
+}
+
+export type ContactRelationship = 'recruiter' | 'referrer' | 'hiring_manager' | 'interviewer' | 'peer' | 'other';
+
+export interface Contact {
+  id: string;
+  name: string;
+  company: string;
+  role: string;
+  relationship: ContactRelationship;
+  email: string;
+  phone: string;
+  linkedin: string;
+  notes: string;
+  applicationIds: string[];
+  lastContacted: string | null;
+  nextFollowUp: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ContactInput = Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>;
+
+export interface UserSettings {
+  weeklyGoal: number;
+  timezone: string;
+  emailDigest: boolean;
+  pushEnabled: boolean;
+  emailTwoFactor: boolean;
+  calendarToken: string | null;
+}

@@ -6,6 +6,7 @@ import { Toaster } from 'sonner';
 import { AuthProvider } from '@/auth/AuthProvider';
 import { applyTheme, usePreferences } from '@/hooks/usePreferences';
 import { router } from './router';
+import { registerServiceWorker } from '@/lib/pwa';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -24,6 +25,8 @@ function ThemedToaster() {
   const { theme } = usePreferences();
   return <Toaster position="bottom-right" theme={theme} richColors closeButton />;
 }
+
+registerServiceWorker();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

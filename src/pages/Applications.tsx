@@ -266,10 +266,10 @@ export default function Applications({ archived = false }: { archived?: boolean 
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+        <div className="glass overflow-hidden rounded-2xl">
           {/* Desktop table */}
           <table className="hidden w-full text-sm md:table">
-            <thead className="border-b border-border bg-surface-2/60 text-left text-xs text-muted">
+            <thead className="border-b border-border/60 bg-fg/[0.02] text-left text-xs text-muted">
               <tr>
                 <th className="w-10 px-3 py-2.5">
                   <input type="checkbox" aria-label="Select all" checked={allSelected} onChange={toggleAll} className="size-4 accent-[var(--accent)]" />
@@ -283,7 +283,7 @@ export default function Applications({ archived = false }: { archived?: boolean 
                 <th className="w-10" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/50">
               {rows.map((a) => (
                 <tr key={a.id} className={cn('group hover:bg-surface-2/50', selected.has(a.id) && 'bg-accent-soft/50')}>
                   <td className="px-3 py-2.5">

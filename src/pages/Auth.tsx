@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 import { toast } from 'sonner';
 import { MailCheck } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
@@ -7,17 +7,20 @@ import { useAuth } from '@/auth/AuthProvider';
 import { Button, Field, Input } from '@/components/ui';
 import { Logo } from '@/components/layout/Logo';
 import { APP_NAME } from '@/lib/constants';
+import { TwoFactorChallenge } from '@/components/security/TwoFactor';
+import { Ambient } from '@/components/layout/Ambient';
 
 const appUrl = (path: string) => `${window.location.origin}${path}`;
 
 function AuthLayout({ title, subtitle, children, footer }: { title: string; subtitle?: ReactNode; children: ReactNode; footer?: ReactNode }) {
   return (
-    <div className="flex min-h-full flex-col items-center justify-center px-4 py-12">
+    <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-12">
+      <Ambient />
       <Link to="/" className="mb-8 flex items-center gap-2">
         <Logo className="size-8" />
         <span className="text-lg font-semibold tracking-tight">{APP_NAME}</span>
       </Link>
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8">
+      <div className="glass-strong w-full max-w-sm animate-enter rounded-3xl p-6 sm:p-8">
         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
         <div className="mt-6">{children}</div>
@@ -391,6 +394,18 @@ export function ResetPassword() {
           Update password
         </Button>
       </form>
+    </AuthLayout>
+  );
+}
+
+export function VerifyTwoFactor() {
+  const { status } = useAuth();
+  if (status === 'loading') return null;
+  if (status === 'signed-in') return <Navigate to="/app" replace />;
+  if (status !== 'needs-2fa') return <Navigate to="/login" replace />;
+  return (
+    <AuthLayout title="Two-step verification" subtitle="One more step to keep your account safe.">
+      <TwoFactorChallenge />
     </AuthLayout>
   );
 }

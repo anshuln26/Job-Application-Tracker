@@ -78,6 +78,7 @@ describe('mappers', () => {
     notes: 'Real note\n\n<!-- CT_META:{"salaryPeriod":"monthly","hoursPerWeek":20,"visaStatus":"domestic"}:CT_META -->',
     timeline: [],
     interviews: null,
+    offer_details: null,
     archived: null,
     archived_at: null,
     created_at: '2026-10-26T00:00:00Z',

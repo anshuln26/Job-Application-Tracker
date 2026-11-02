@@ -14,6 +14,7 @@ import {
 } from '@/lib/constants';
 import { CURRENCIES } from '@/lib/currency';
 import { cn } from '@/lib/utils';
+import { JobLinkAutofill } from './JobLinkAutofill';
 import type { ApplicationInput } from '@/types';
 
 interface Props {
@@ -63,6 +64,14 @@ export function ApplicationForm({ initial, submitLabel, onSubmit, onCancel, savi
 
   return (
     <form onSubmit={submit} className="space-y-5" noValidate>
+      {!initial.company && (
+        <JobLinkAutofill
+          onFill={(patch) => {
+            setV((prev) => ({ ...prev, ...patch }));
+            if (patch.salaryMin || patch.salaryMax) setMore(true);
+          }}
+        />
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Company *" error={errors.company}>
           {(id) => (
@@ -317,7 +326,7 @@ export function ApplicationForm({ initial, submitLabel, onSubmit, onCancel, savi
         </div>
       )}
 
-      <div className="sticky bottom-0 -mx-5 -mb-4 flex justify-end gap-2 border-t border-border bg-surface px-5 py-3">
+      <div className="sticky bottom-0 -mx-5 -mb-4 flex justify-end gap-2 border-t border-border/60 bg-surface/60 px-5 py-3 backdrop-blur">
         <Button variant="secondary" onClick={onCancel}>
           Cancel
         </Button>
