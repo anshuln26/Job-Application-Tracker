@@ -96,7 +96,7 @@ export default function Dashboard() {
       {header}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat icon={Briefcase} label="Active" value={s.active} hint={`${s.total} total`} tint="from-indigo-500 to-violet-500" />
+        <Stat icon={Briefcase} label="Active" value={s.active} hint={`${s.total} total`} tint="from-blue-500 to-violet-500" />
         <Stat icon={Send} label="Submitted" value={s.submitted} hint={`${goal.thisWeek} this week`} tint="from-sky-500 to-cyan-400" />
         <Stat icon={CalendarClock} label="Interviewing" value={s.interviews} hint={`${s.responseRate}% response rate`} tint="from-amber-500 to-orange-400" />
         <Stat icon={Trophy} label="Offers" value={s.offers} hint={s.submitted ? `${s.offerRate}% of applications` : '—'} tint="from-emerald-500 to-teal-400" />

@@ -7,6 +7,7 @@ export function Logo({ className = 'size-8' }: { className?: string }) {
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="var(--accent)" />
+          <stop offset="0.5" stopColor="var(--accent-2)" />
           <stop offset="1" stopColor="var(--accent-3)" />
         </linearGradient>
       </defs>
