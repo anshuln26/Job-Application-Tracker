@@ -14,6 +14,8 @@
   --color-subtle: var(--subtle);
   --color-accent: var(--accent);
   --color-accent-2: var(--accent-2);
+  --color-accent-3: var(--accent-3);
+  --color-accent-4: var(--accent-4);
   --color-accent-fg: var(--accent-fg);
   --color-accent-soft: var(--accent-soft);
   --color-danger: var(--danger);
@@ -25,57 +27,61 @@
 }
 
 :root {
-  --bg: #eef0f8;
+  --bg: #edf2f8;
   --surface: #ffffff;
-  --surface-2: #f1f2f8;
-  --border: #dfe1ec;
-  --fg: #15151f;
-  --muted: #565869;
-  --subtle: #868899;
-  --accent: #5b5bf0;
-  --accent-2: #a855f7;
+  --surface-2: #eff4f9;
+  --border: #d9e2ee;
+  --fg: #0f172a;
+  --muted: #4b5568;
+  --subtle: #7b8799;
+  --accent: #3b6cf6;
+  --accent-2: #8b5cf6;
   --accent-3: #ec4899;
+  --accent-4: #10b981;
   --accent-fg: #ffffff;
-  --accent-soft: #e9eaff;
+  --accent-soft: #e5edff;
   --danger: #dc2626;
-  --ring: #818cf8;
+  --ring: #60a5fa;
 
-  --glass: rgb(255 255 255 / 0.62);
-  --glass-strong: rgb(255 255 255 / 0.82);
+  --glass: rgb(255 255 255 / 0.6);
+  --glass-strong: rgb(255 255 255 / 0.8);
   --glass-border: rgb(255 255 255 / 0.75);
   --glass-edge: rgb(15 23 42 / 0.07);
-  --glass-shadow: rgb(31 38 135 / 0.12);
-  --blob-1: #a5b4fc;
-  --blob-2: #f0abfc;
-  --blob-3: #7dd3fc;
+  --glass-shadow: rgb(30 64 175 / 0.13);
+  --blob-1: #93c5fd;
+  --blob-2: #6ee7b7;
+  --blob-3: #c4b5fd;
+  --blob-4: #f9a8d4;
   --grid: rgb(15 23 42 / 0.05);
   color-scheme: light;
 }
 
 .dark {
-  --bg: #07070d;
-  --surface: #12121b;
-  --surface-2: #1a1a26;
-  --border: #2a2a3a;
-  --fg: #ededf3;
-  --muted: #a3a3b6;
-  --subtle: #6f7084;
-  --accent: #8b8cff;
-  --accent-2: #c084fc;
+  --bg: #050a14;
+  --surface: #0e1524;
+  --surface-2: #152033;
+  --border: #22304a;
+  --fg: #e8eef7;
+  --muted: #9aa8bd;
+  --subtle: #66748a;
+  --accent: #60a5fa;
+  --accent-2: #a78bfa;
   --accent-3: #f472b6;
-  --accent-fg: #0b0b12;
-  --accent-soft: #1f2040;
+  --accent-4: #34d399;
+  --accent-fg: #06101f;
+  --accent-soft: #14223d;
   --danger: #f87171;
-  --ring: #6366f1;
+  --ring: #3b82f6;
 
-  --glass: rgb(22 22 34 / 0.55);
-  --glass-strong: rgb(22 22 34 / 0.8);
+  --glass: rgb(14 21 36 / 0.55);
+  --glass-strong: rgb(14 21 36 / 0.8);
   --glass-border: rgb(255 255 255 / 0.08);
   --glass-edge: rgb(255 255 255 / 0.04);
   --glass-shadow: rgb(0 0 0 / 0.45);
-  --blob-1: #4f46e5;
-  --blob-2: #9333ea;
-  --blob-3: #0ea5e9;
+  --blob-1: #2563eb;
+  --blob-2: #059669;
+  --blob-3: #7c3aed;
+  --blob-4: #db2777;
   --grid: rgb(255 255 255 / 0.035);
   color-scheme: dark;
 }
@@ -135,7 +141,7 @@ body {
 /* ---------- Accents ---------- */
 
 .text-gradient {
-  background: linear-gradient(110deg, var(--accent) 0%, var(--accent-2) 45%, var(--accent-3) 100%);
+  background: linear-gradient(110deg, var(--accent) 0%, var(--accent-4) 30%, var(--accent-2) 65%, var(--accent-3) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -161,7 +167,7 @@ body {
   inset: -1px;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2), var(--accent-3));
+  background: linear-gradient(135deg, var(--accent), var(--accent-4), var(--accent-2), var(--accent-3));
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
